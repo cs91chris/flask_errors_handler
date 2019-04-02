@@ -12,8 +12,8 @@ with open("README.rst", "r") as fh:
 
 setup(
     name='Flask-ErrorsHandler',
-    version='0.0.1',
-    url='https://github.com/cs91chris/flask-errors_handler',
+    version='1.0.0',
+    url='https://github.com/cs91chris/flask_errors_handler',
     license='MIT',
     author='cs91chris',
     author_email='cs91chris@voidbrain.me',

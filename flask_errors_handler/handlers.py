@@ -12,40 +12,58 @@ from werkzeug.exceptions import InternalServerError
 
 
 class ErrorHandler:
-    def __init__(self, app=None):
+    def __init__(self, app=None, response=None):
         """
 
         :param app:
+        :param response:
         """
         self._app = None
+        self._response = None
 
         if app is not None:
-            self.init_app(app)
+            self.init_app(app, response)
 
-    def init_app(self, app):
+    def init_app(self, app, response=None):
         """
 
         :param app:
+        :param response:
         """
         self._app = app
+        self._response = response or as_json
         self._app.config.setdefault('ERROR_PAGE', None)
         self._app.config.setdefault('ERROR_DEFAULT_MSG', 'Unhandled Exception')
 
     @staticmethod
-    @as_json
-    def _make_json_error(ex):
+    def _register(bp, hderr, hddef):
+        """
+
+        :param bp:
+        :param hderr:
+        :param hddef:
+        """
+        for code in default_exceptions.keys():
+            bp.errorhandler(code)(hderr)
+
+        bp.register_error_handler(Exception, hddef)
+
+    def _make_response_error(self, ex):
         """
 
         :param ex:
         :return:
         """
-        if isinstance(ex, HTTPException) and ex.code:
-            status_code = ex.code
-        else:
-            status_code = 500
+        @self._response
+        def _response():
+            if isinstance(ex, HTTPException) and ex.code:
+                status_code = ex.code
+            else:
+                status_code = 500
 
-        response = dict(message=str(ex), status=status_code)
-        return response, status_code
+            response = dict(message=str(ex), status=status_code)
+            return response, status_code
+        return _response()
 
     def _api_all_error_handler(self, error):
         """
@@ -53,12 +71,12 @@ class ErrorHandler:
         :param error:
         :return:
         """
-        self._app.logger.error(traceback.print_exc())
+        self._app.logger.error(traceback.format_exc())
         exc = InternalServerError(
             error if self._app.config['DEBUG']
             else self._app.config['ERROR_DEFAULT_MSG']
         )
-        return ErrorHandler._make_json_error(exc)
+        return self._make_response_error(exc)
 
     def _web_error_handler(self, e):
         """
@@ -67,11 +85,11 @@ class ErrorHandler:
         :return:
         """
         if not isinstance(e, HTTPException):
-            self._app.logger.error(traceback.print_exc())
+            self._app.logger.error(traceback.format_exc())
             e = InternalServerError()
 
         if request.is_xhr:
-            @as_json
+            @self._response
             def jsonify():
                 return {
                     'status': e.code,
@@ -79,27 +97,15 @@ class ErrorHandler:
                     'message': e.description
                 }, e.code
             return jsonify()
-        elif self._app.config['ERROR_PAGE']:
+
+        if self._app.config['ERROR_PAGE']:
             return render_template(
                 self._app.config['ERROR_PAGE'],
                 error=e.name,
                 message=e.description
             ), e.code
-        else:
-            abort(e.code, e.description)
 
-    @staticmethod
-    def _register(bp, hderr, hddef):
-        """
-
-        :param bp:
-        :param hderr:
-        :param def_hderr:
-        """
-        for code in default_exceptions.keys():
-            bp.errorhandler(code)(hderr)
-
-        bp.register_error_handler(Exception, hddef)
+        abort(e.code, e.description)
 
     def api_register(self, component):
         """
@@ -108,7 +114,7 @@ class ErrorHandler:
         """
         ErrorHandler._register(
             component,
-            ErrorHandler._make_json_error,
+            self._make_response_error,
             self._api_all_error_handler
         )
 

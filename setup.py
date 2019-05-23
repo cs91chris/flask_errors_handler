@@ -2,10 +2,10 @@
 Flask-ErrorsHandler
 -------------
 
-Default errors handler for flask application and blueprints
+Customizable errors handler for flask application and blueprints
 """
 from setuptools import setup
-
+from setuptools import find_packages
 
 with open("README.rst", "r") as fh:
     long_description = fh.read()
@@ -17,15 +17,14 @@ setup(
     license='MIT',
     author='cs91chris',
     author_email='cs91chris@voidbrain.me',
-    description='Default errors handler for flask application and blueprints',
+    description='Customizable errors handler for flask application and blueprints',
     long_description=long_description,
-    packages=['flask_errors_handler'],
+    packages=find_packages(),
     zip_safe=False,
     include_package_data=True,
     platforms='any',
     install_requires=[
-        'Flask==1.0.2',
-        'Flask-JSON==0.3.3'
+        'Flask==1.0.2'
     ],
     classifiers=[
         'Environment :: Web Environment',

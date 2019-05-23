@@ -1,14 +1,27 @@
 import traceback
+from functools import wraps
 
 from flask import abort
 from flask import request
+from flask import jsonify
 from flask import render_template
-
-from flask_json import as_json
 
 from werkzeug.exceptions import HTTPException
 from werkzeug.exceptions import default_exceptions
 from werkzeug.exceptions import InternalServerError
+
+
+def default_response_builder(f):
+    """
+
+    :param f: function that returns dict or Response object and status code
+    :return: flask jsonify and status code of decorated function
+    """
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        r, s = f(*args, **kwargs)
+        return jsonify(r), s
+    return wrapper
 
 
 class ErrorHandler:
@@ -16,7 +29,7 @@ class ErrorHandler:
         """
 
         :param app:
-        :param response:
+        :param response: decorator
         """
         self._app = None
         self._response = None
@@ -28,103 +41,94 @@ class ErrorHandler:
         """
 
         :param app:
-        :param response:
+        :param response: decorator
         """
         self._app = app
-        self._response = response or as_json
+        self._response = response or default_response_builder
         self._app.config.setdefault('ERROR_PAGE', None)
         self._app.config.setdefault('ERROR_DEFAULT_MSG', 'Unhandled Exception')
 
     @staticmethod
-    def _register(bp, hderr, hddef):
+    def register(bp, hderr):
         """
 
-        :param bp:
-        :param hderr:
-        :param hddef:
+        :param bp: blueprint or flask app
+        :param hderr: function that takes only an Exception object as argument
         """
         for code in default_exceptions.keys():
             bp.errorhandler(code)(hderr)
 
-        bp.register_error_handler(Exception, hddef)
+        bp.register_error_handler(Exception, hderr)
 
-    def _make_response_error(self, ex):
+    def _normalize(self, ex):
+        """
+        Wraps a generic Exception into InternalServerError in order to have the same interface
+        :param ex: Exception
+        :return: new Exception instance of HTTPException
+        """
+        if not isinstance(ex, HTTPException):
+            self._app.logger.error(traceback.format_exc())
+            ex = InternalServerError(
+                ex if self._app.config['DEBUG']
+                else self._app.config['ERROR_DEFAULT_MSG']
+            )
+        return ex
+
+    def _api_error_handler(self, ex):
         """
 
-        :param ex:
+        :param ex: Exception
         :return:
         """
+        ex = self._normalize(ex)
+
         @self._response
         def _response():
-            if isinstance(ex, HTTPException) and ex.code:
-                status_code = ex.code
-            else:
-                status_code = 500
+            return dict(
+                error=ex.name,
+                description=ex.description,
+                status=ex.code,
+                response=ex.response or {}
+            ), ex.code
 
-            response = dict(message=str(ex), status=status_code)
-            return response, status_code
         return _response()
 
-    def _api_all_error_handler(self, error):
+    def _web_error_handler(self, ex):
         """
 
-        :param error:
+        :param ex: Exception
         :return:
         """
-        self._app.logger.error(traceback.format_exc())
-        exc = InternalServerError(
-            error if self._app.config['DEBUG']
-            else self._app.config['ERROR_DEFAULT_MSG']
-        )
-        return self._make_response_error(exc)
-
-    def _web_error_handler(self, e):
-        """
-
-        :param e:
-        :return:
-        """
-        if not isinstance(e, HTTPException):
-            self._app.logger.error(traceback.format_exc())
-            e = InternalServerError()
+        ex = self._normalize(ex)
 
         if request.is_xhr:
-            @self._response
-            def jsonify():
-                return {
-                    'status': e.code,
-                    'error': e.name,
-                    'message': e.description
-                }, e.code
-            return jsonify()
+            return self._api_error_handler(ex)
 
         if self._app.config['ERROR_PAGE']:
             return render_template(
                 self._app.config['ERROR_PAGE'],
-                error=e.name,
-                message=e.description
-            ), e.code
+                error=ex.name,
+                message=ex.description
+            ), ex.code
 
-        abort(e.code, e.description)
+        abort(ex.code, ex.description)
 
     def api_register(self, component):
         """
 
-        :param component:
+        :param component: app or blueprint
         """
-        ErrorHandler._register(
+        ErrorHandler.register(
             component,
-            self._make_response_error,
-            self._api_all_error_handler
+            self._api_error_handler
         )
 
     def web_register(self, component):
         """
 
-        :param component:
+        :param component: app or blueprint
         """
-        ErrorHandler._register(
+        ErrorHandler.register(
             component,
-            self._web_error_handler,
             self._web_error_handler
         )

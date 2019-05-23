@@ -6,7 +6,6 @@ from flask_errors_handler import ErrorHandler
 
 
 app = Flask(__name__)
-app.config['JSON_ADD_STATUS'] = False
 app.config['ERROR_PAGE'] = 'error.html'
 
 error = ErrorHandler()

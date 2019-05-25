@@ -64,20 +64,25 @@ class ErrorHandler:
                     bp.errorhandler(code)(hderr)
 
                 bp.register_error_handler(Exception, hderr)
+
             return wrapper()
         return _register
 
-    def _normalize(self, ex):
+    def normalize(self, ex, exc_class=None, **kwargs):
         """
 
         :param ex: Exception
+        :param exc_class: custom Exception class
         :return: new Exception instance of HTTPException
         """
         if not isinstance(ex, HTTPException):
+            # noinspection PyPep8Naming
+            ExceptionClass = exc_class or InternalServerError
             self._app.logger.error(traceback.format_exc())
-            ex = InternalServerError(
+            ex = ExceptionClass(
                 ex if self._app.config['DEBUG']
-                else self._app.config['ERROR_DEFAULT_MSG']
+                else self._app.config['ERROR_DEFAULT_MSG'],
+                **kwargs
             )
         return ex
 
@@ -87,7 +92,7 @@ class ErrorHandler:
         :param ex: Exception
         :return:
         """
-        ex = self._normalize(ex)
+        ex = self.normalize(ex)
 
         @self._response
         def _response():
@@ -95,7 +100,7 @@ class ErrorHandler:
                 error=ex.name,
                 description=ex.description,
                 status=ex.code,
-                response=ex.response or {}
+                response=ex.response
             ), ex.code
 
         return _response()
@@ -106,7 +111,7 @@ class ErrorHandler:
         :param ex: Exception
         :return:
         """
-        ex = self._normalize(ex)
+        ex = self.normalize(ex)
 
         if request.is_xhr:
             return self._api_handler(ex)
@@ -114,8 +119,7 @@ class ErrorHandler:
         if self._app.config['ERROR_PAGE']:
             return render_template(
                 self._app.config['ERROR_PAGE'],
-                error=ex.name,
-                message=ex.description
+                error=ex
             ), ex.code
 
         abort(ex.code, ex.description)

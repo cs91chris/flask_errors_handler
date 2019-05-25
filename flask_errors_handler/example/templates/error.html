@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Error</title>
+    <title>Error {{ error.code }}</title>
 </head>
 <body>
-    <h1>{{ error }}</h1>
-    <p>{{ message }}</p>
+    <h1>{{ error.name }}</h1>
+    <p>{{ error.description }}</p>
 </body>
 </html>

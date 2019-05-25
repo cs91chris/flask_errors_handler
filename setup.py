@@ -4,8 +4,12 @@ Flask-ErrorsHandler
 
 Customizable errors handler for flask application and blueprints
 """
+import sys
+import pytest
+
 from setuptools import setup
 from setuptools import find_packages
+from setuptools.command.test import test
 
 from flask_errors_handler import __version__
 from flask_errors_handler import __author__
@@ -16,6 +20,15 @@ email = email.lstrip('<').rstrip('>')
 
 with open("README.rst", "r") as fh:
     long_description = fh.read()
+
+
+class PyTest(test):
+    def finalize_options(self):
+        test.finalize_options(self)
+
+    def run_tests(self):
+        sys.exit(pytest.main(['tests']))
+
 
 setup(
     name='Flask-ErrorsHandler',
@@ -33,6 +46,12 @@ setup(
     install_requires=[
         'Flask==1.0.2'
     ],
+    tests_require=[
+        'pytest==4.5.0',
+        'pytest-cov==2.7.1'
+    ],
+    cmdclass={'test': PyTest},
+    test_suite='tests',
     classifiers=[
         'Environment :: Web Environment',
         'Intended Audience :: Developers',

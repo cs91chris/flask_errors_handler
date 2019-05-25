@@ -1,7 +1,6 @@
 import traceback
 from functools import wraps
 
-from flask import abort
 from flask import request
 from flask import jsonify
 from flask import render_template
@@ -116,13 +115,14 @@ class ErrorHandler:
         if request.is_xhr:
             return self._api_handler(ex)
 
-        if self._app.config['ERROR_PAGE']:
+        if self._app.config['ERROR_PAGE'] is not None:
             return render_template(
                 self._app.config['ERROR_PAGE'],
                 error=ex
             ), ex.code
 
-        abort(ex.code, ex.description)
+        return str(ex) if self._app.config['DEBUG'] \
+            else self._app.config['ERROR_DEFAULT_MSG'], 500
 
     def api_register(self, bp):
         """

@@ -20,7 +20,7 @@ custom = Blueprint('custom', __name__)
 
 @error.register(custom)
 def error_handler(exc):
-    return str(exc), 500
+    return str(exc), 500, {'Content-Type': 'text/plain'}
 
 
 @app.route('/api')

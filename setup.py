@@ -7,12 +7,19 @@ Customizable errors handler for flask application and blueprints
 from setuptools import setup
 from setuptools import find_packages
 
+from flask_errors_handler import __version__
+from flask_errors_handler import __author__
+
+
+author, email = __author__.split()
+email = email.lstrip('<').rstrip('>')
+
 with open("README.rst", "r") as fh:
     long_description = fh.read()
 
 setup(
     name='Flask-ErrorsHandler',
-    version='1.0.0',
+    version=__version__,
     url='https://github.com/cs91chris/flask_errors_handler',
     license='MIT',
     author='cs91chris',

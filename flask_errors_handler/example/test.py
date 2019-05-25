@@ -15,6 +15,13 @@ error.api_register(app)
 web = Blueprint('web', __name__)
 error.web_register(web)
 
+custom = Blueprint('custom', __name__)
+
+
+@error.register(custom)
+def error_handler(exc):
+    return str(exc), 500
+
 
 @app.route('/api')
 def index():
@@ -26,5 +33,11 @@ def index():
     abort(500, 'Error from web blueprint')
 
 
+@custom.route('/custom')
+def index():
+    abort(500, 'Error from custom blueprint')
+
+
 app.register_blueprint(web)
+app.register_blueprint(custom)
 app.run()

@@ -49,20 +49,27 @@ class ErrorHandler:
         self._app.config.setdefault('ERROR_DEFAULT_MSG', 'Unhandled Exception')
 
     @staticmethod
-    def register(bp, hderr):
+    def register(bp):
         """
 
         :param bp: blueprint or flask app
-        :param hderr: function that takes only an Exception object as argument
         """
-        for code in default_exceptions.keys():
-            bp.errorhandler(code)(hderr)
+        def _register(hderr):
+            """
+            :param hderr: function that takes only an Exception object as argument
+            """
+            @wraps(hderr)
+            def wrapper():
+                for code in default_exceptions.keys():
+                    bp.errorhandler(code)(hderr)
 
-        bp.register_error_handler(Exception, hderr)
+                bp.register_error_handler(Exception, hderr)
+            return wrapper()
+        return _register
 
     def _normalize(self, ex):
         """
-        Wraps a generic Exception into InternalServerError in order to have the same interface
+
         :param ex: Exception
         :return: new Exception instance of HTTPException
         """
@@ -74,7 +81,7 @@ class ErrorHandler:
             )
         return ex
 
-    def _api_error_handler(self, ex):
+    def _api_handler(self, ex):
         """
 
         :param ex: Exception
@@ -93,7 +100,7 @@ class ErrorHandler:
 
         return _response()
 
-    def _web_error_handler(self, ex):
+    def _web_handler(self, ex):
         """
 
         :param ex: Exception
@@ -102,7 +109,7 @@ class ErrorHandler:
         ex = self._normalize(ex)
 
         if request.is_xhr:
-            return self._api_error_handler(ex)
+            return self._api_handler(ex)
 
         if self._app.config['ERROR_PAGE']:
             return render_template(
@@ -113,22 +120,16 @@ class ErrorHandler:
 
         abort(ex.code, ex.description)
 
-    def api_register(self, component):
+    def api_register(self, bp):
         """
 
-        :param component: app or blueprint
+        :param bp: app or blueprint
         """
-        ErrorHandler.register(
-            component,
-            self._api_error_handler
-        )
+        ErrorHandler.register(bp)(self._api_handler)
 
-    def web_register(self, component):
+    def web_register(self, bp):
         """
 
-        :param component: app or blueprint
+        :param bp: app or blueprint
         """
-        ErrorHandler.register(
-            component,
-            self._web_error_handler
-        )
+        ErrorHandler.register(bp)(self._web_handler)

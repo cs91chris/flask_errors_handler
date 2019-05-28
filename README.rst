@@ -65,9 +65,9 @@ Example usage
     app.run()
 
 
-Go to http://127.0.0.1:5000/api and see error message response as a JSON
-Go to http://127.0.0.1:5000/web and see error message response as an HTML page
-Go to http://127.0.0.1:5000/custom and see error message response as a plain text
+- Go to http://127.0.0.1:5000/api and see error message response as a JSON
+- Go to http://127.0.0.1:5000/web and see error message response as an HTML page
+- Go to http://127.0.0.1:5000/custom and see error message response as a plain text
 
 .. _section-2:
 

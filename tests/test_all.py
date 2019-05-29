@@ -7,20 +7,28 @@ from flask import Blueprint
 from werkzeug.exceptions import BadRequest
 
 from flask_errors_handler import ErrorHandler
+from flask_errors_handler import DefaultDispatcher
+from flask_errors_handler import SubdomainDispatcher
+from flask_errors_handler import URLPrefixDispatcher
+
+
+error = ErrorHandler()
 
 
 @pytest.fixture
 def app():
     _app = Flask(__name__)
+    _app.config['SERVER_NAME'] = 'flask.dev:5000'
     _app.config['ERROR_PAGE'] = 'error.html'
-    error = ErrorHandler(_app)
 
     web = Blueprint('web', __name__)
-    custom = Blueprint('custom', __name__)
+    custom = Blueprint('custom', __name__, subdomain='api')
     test_bp = Blueprint('test_bp', __name__)
 
+    error.init_app(_app)
     error.api_register(_app)
     error.web_register(web)
+    error.register_dispatcher(DefaultDispatcher)
 
     @test_bp.route('/test')
     def test():
@@ -29,7 +37,7 @@ def app():
 
     @error.register(custom)
     def error_handler(exc):
-        return str(exc), 500, {'Content-Type': 'text/plain'}
+        return str(exc), 404, {'Content-Type': 'text/plain', 'custom': 'test'}
 
     @_app.route('/api')
     def index():
@@ -52,9 +60,9 @@ def app():
     def index():
         abort(500, 'Error from custom blueprint')
 
-    _app.register_blueprint(web)
+    _app.register_blueprint(web, url_prefix='/web')
     _app.register_blueprint(custom)
-    _app.register_blueprint(test_bp)
+    _app.register_blueprint(test_bp, url_prefix='/testbp')
 
     _app.testing = True
     return _app
@@ -84,30 +92,55 @@ def test_api_error(client):
 
 
 def test_web(client):
-    res = client.get('/web')
+    res = client.get('/web/web')
     assert res.status_code == 500
     assert res.headers.get('Content-Type') == 'text/html; charset=utf-8'
 
 
 def test_web_xhr(client):
-    res = client.get('/web', headers={'X-Requested-With': 'XMLHttpRequest'})
+    res = client.get('/web/web', headers={'X-Requested-With': 'XMLHttpRequest'})
     assert res.status_code == 500
     assert res.headers.get('Content-Type') == 'application/json'
 
 
 def test_web_error(client):
-    res = client.get('/web/error')
+    res = client.get('/web/web/error')
     assert res.status_code == 500
     assert res.headers.get('Content-Type') == 'text/html; charset=utf-8'
 
 
-def test_custom(client):
-    res = client.get('/custom')
-    assert res.status_code == 500
+def test_custom(client, app):
+    res = client.get('/custom', base_url='http://api.' + app.config['SERVER_NAME'])
+    assert res.status_code == 404
     assert res.headers.get('Content-Type') == 'text/plain'
 
 
 def test_custom_error(client):
-    res = client.get('/test')
+    res = client.get('/testbp/test')
     assert res.status_code == 400
     assert res.headers.get('Content-Type') == 'application/json'
+
+
+def test_dispatch_error_web(client):
+    error.register_dispatcher(URLPrefixDispatcher)
+    res = client.get('/web/page-not-found')
+    assert res.status_code == 404
+    assert 'text/html' in res.headers['Content-Type']
+
+
+def test_dispatch_error_api(client, app):
+    error.register_dispatcher(SubdomainDispatcher)
+    res = client.get('/api-not-found', base_url='http://api.' + app.config['SERVER_NAME'])
+    assert res.status_code == 404
+    assert 'text/plain' in res.headers['Content-Type']
+    assert 'test' in res.headers['custom']
+
+
+def test_dispatch_default(client):
+    res = client.get('/testbp/not-found')
+    assert res.status_code == 404
+    assert 'text/plain' in res.headers['Content-Type']
+
+    res = client.post('/testbp/test')
+    assert res.status_code == 405
+    assert 'text/plain' in res.headers['Content-Type']

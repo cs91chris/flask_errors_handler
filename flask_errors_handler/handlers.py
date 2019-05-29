@@ -137,3 +137,22 @@ class ErrorHandler:
         :param bp: app or blueprint
         """
         ErrorHandler.register(bp)(self._web_handler)
+
+    def register_dispatcher(self, dispatcher, codes=None):
+        """
+
+        :param dispatcher:
+        :param codes:
+        """
+        codes = codes or (404, 405)
+
+        for c in codes:
+            @self._app.errorhandler(c)
+            def error_handler(exc):
+                """
+
+                :param exc:
+                :return:
+                """
+                d = dispatcher(self._app)
+                return d.dispatch(self.normalize(exc))

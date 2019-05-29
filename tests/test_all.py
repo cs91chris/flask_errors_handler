@@ -28,7 +28,6 @@ def app():
     error.init_app(_app)
     error.api_register(_app)
     error.web_register(web)
-    error.register_dispatcher(DefaultDispatcher)
 
     @test_bp.route('/test')
     def test():
@@ -37,7 +36,7 @@ def app():
 
     @error.register(custom)
     def error_handler(exc):
-        return str(exc), 404, {'Content-Type': 'text/plain', 'custom': 'test'}
+        return str(exc), 404, {'Content-Type': 'text/html', 'custom': 'test'}
 
     @_app.route('/api')
     def index():
@@ -60,8 +59,8 @@ def app():
     def index():
         abort(500, 'Error from custom blueprint')
 
-    _app.register_blueprint(web, url_prefix='/web')
     _app.register_blueprint(custom)
+    _app.register_blueprint(web, url_prefix='/web')
     _app.register_blueprint(test_bp, url_prefix='/testbp')
 
     _app.testing = True
@@ -82,13 +81,21 @@ def test_app_runs(client):
 def test_api(client):
     res = client.get('/api')
     assert res.status_code == 500
-    assert res.headers.get('Content-Type') == 'application/json'
+    assert res.headers.get('Content-Type') == 'application/problem+json'
+
+    data = res.get_json()
+    assert data['type'] == 'about:blank'
+    assert data['title'] == 'Internal Server Error'
+    assert data['detail'] is not None
+    assert data['status'] == 500
+    assert data['instance'] == 'about:blank'
+    assert data['data'] is None
 
 
 def test_api_error(client):
     res = client.get('/api/error')
     assert res.status_code == 500
-    assert res.headers.get('Content-Type') == 'application/json'
+    assert res.headers.get('Content-Type') == 'application/problem+json'
 
 
 def test_web(client):
@@ -100,7 +107,7 @@ def test_web(client):
 def test_web_xhr(client):
     res = client.get('/web/web', headers={'X-Requested-With': 'XMLHttpRequest'})
     assert res.status_code == 500
-    assert res.headers.get('Content-Type') == 'application/json'
+    assert res.headers.get('Content-Type') == 'application/problem+json'
 
 
 def test_web_error(client):
@@ -112,18 +119,18 @@ def test_web_error(client):
 def test_custom(client, app):
     res = client.get('/custom', base_url='http://api.' + app.config['SERVER_NAME'])
     assert res.status_code == 404
-    assert res.headers.get('Content-Type') == 'text/plain'
+    assert res.headers.get('Content-Type') == 'text/html'
 
 
 def test_custom_error(client):
     res = client.get('/testbp/test')
     assert res.status_code == 400
-    assert res.headers.get('Content-Type') == 'application/json'
+    assert res.headers.get('Content-Type') == 'application/problem+json'
 
 
 def test_dispatch_error_web(client):
     error.register_dispatcher(URLPrefixDispatcher)
-    res = client.get('/web/page-not-found')
+    res = client.get('/web/web/page-not-found')
     assert res.status_code == 404
     assert 'text/html' in res.headers['Content-Type']
 
@@ -132,11 +139,12 @@ def test_dispatch_error_api(client, app):
     error.register_dispatcher(SubdomainDispatcher)
     res = client.get('/api-not-found', base_url='http://api.' + app.config['SERVER_NAME'])
     assert res.status_code == 404
-    assert 'text/plain' in res.headers['Content-Type']
+    assert 'text/html' in res.headers['Content-Type']
     assert 'test' in res.headers['custom']
 
 
 def test_dispatch_default(client):
+    error.register_dispatcher(DefaultDispatcher)
     res = client.get('/testbp/not-found')
     assert res.status_code == 404
     assert 'text/plain' in res.headers['Content-Type']

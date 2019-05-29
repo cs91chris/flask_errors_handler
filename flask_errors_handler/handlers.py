@@ -1,25 +1,29 @@
 import traceback
 from functools import wraps
 
+from flask import json
 from flask import request
-from flask import jsonify
+from flask import Response
 from flask import render_template
 
 from werkzeug.exceptions import HTTPException
 from werkzeug.exceptions import default_exceptions
 from werkzeug.exceptions import InternalServerError
 
+from .dispatchers import ErrorDispatcher
+
 
 def default_response_builder(f):
     """
 
     :param f: function that returns dict or Response object and status code
-    :return: flask jsonify and status code of decorated function
+    :return: flask response  of decorated function
     """
     @wraps(f)
     def wrapper(*args, **kwargs):
         r, s = f(*args, **kwargs)
-        return jsonify(r), s
+        m = 'application/problem+json'
+        return Response(json.dumps(r), status=s, mimetype=m)
     return wrapper
 
 
@@ -47,6 +51,10 @@ class ErrorHandler:
         self._app.config.setdefault('ERROR_PAGE', None)
         self._app.config.setdefault('ERROR_DEFAULT_MSG', 'Unhandled Exception')
 
+        if not hasattr(app, 'extensions'):
+            app.extensions = dict()
+        app.extensions['errors_handler'] = self
+
     @staticmethod
     def register(bp):
         """
@@ -55,6 +63,7 @@ class ErrorHandler:
         """
         def _register(hderr):
             """
+
             :param hderr: function that takes only an Exception object as argument
             """
             @wraps(hderr)
@@ -92,14 +101,18 @@ class ErrorHandler:
         :return:
         """
         ex = self.normalize(ex)
+        _type = ex.type if hasattr(ex, 'type') else 'about:blank'
+        _instance = ex.instance if hasattr(ex, 'instance') else 'about:blank'
 
         @self._response
         def _response():
             return dict(
-                error=ex.name,
-                description=ex.description,
+                type=_type,
+                title=ex.name,
+                detail=ex.description,
                 status=ex.code,
-                response=ex.response
+                instance=_instance,
+                data=ex.response
             ), ex.code
 
         return _response()
@@ -123,6 +136,14 @@ class ErrorHandler:
 
         return str(ex) if self._app.config['DEBUG'] \
             else self._app.config['ERROR_DEFAULT_MSG'], 500
+
+    # noinspection PyMethodMayBeStatic
+    def default_register(self, bp):
+        """
+
+        :param bp:
+        """
+        ErrorHandler.register(bp)(ErrorDispatcher.default)
 
     def api_register(self, bp):
         """

@@ -1,10 +1,30 @@
 Flask-ErrorsHandler
 ===================
 
-Set default errors handler for flask app and blueprints.
+Set customizable default errors handler for flask app and blueprints.
 
-You can register handler for api that returns JSON, for web that returns html page or JSON if request is XHR, or
-you can register custom handlers for blueprint or the entire app.
+You can register error handler for:
+
+- api that returns JSON, default response is as API problem specification like (see https://tools.ietf.org/html/rfc7807).
+  Instead you can use your own response implementation passed as argument to ``ErrorHandler`` class:
+  it must be a decorator and must take 3 args, a dict response, status code and dict headers.
+- web that returns html page or api response if request is XHR
+- you can register custom handlers for blueprint or the entire app
+
+This module provide also an abstract ``ErrorDispatcher`` class in order to dispatch 404 or 405 error to the correct blueprint
+because flask Blueprint does not own url_prefix (see https://github.com/pallets/flask/issues/1498).
+
+There are 2 concrete implementation:
+
+- ``SubdomainDispatcher``: dispatch the error to the handler associate with blueprint with certain subdomain
+  (if 2 or more Blueprint has the same subdomain the first blueprint handler matched is used)
+- ``URLPrefixDispatcher``: dispatch the error to the handler associate with blueprint with certain url prefix.
+  This will not work if 2 Blueprint are registered under the same url prefix, for example:
+  Blueprint A registered under /prefix/blueprint, Blueprint B registered under /prefix, this dispatcher executes the handler
+  of B in both case if B is registered after A.
+
+Moreover you can create you own dispatcher by extending ``ErrorDispatcher`` class and implementing ``dispatch`` method.
+Only the *last* ErrorDispatcher registered is execute. This is the best solution I have found, suggestions are welcome.
 
 
 QuickStart
@@ -76,5 +96,7 @@ Configuration
 
 1. ``ERROR_PAGE``: *(default: None)* path of html template to use for show error message
 2. ``ERROR_DEFAULT_MSG``: *(default: Unhandled Exception)* default message for unhandled exceptions
+3. ``ERROR_XHR_ENABLED``: *(default: True)* enable or disable api response where request is XHR
+
 
 License MIT

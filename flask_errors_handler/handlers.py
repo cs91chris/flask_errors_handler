@@ -49,6 +49,7 @@ class ErrorHandler:
         self._app = app
         self._response = response or default_response_builder
         self._app.config.setdefault('ERROR_PAGE', None)
+        self._app.config.setdefault('ERROR_XHR_ENABLED', True)
         self._app.config.setdefault('ERROR_DEFAULT_MSG', 'Unhandled Exception')
 
         if not hasattr(app, 'extensions'):
@@ -125,8 +126,9 @@ class ErrorHandler:
         """
         ex = self.normalize(ex)
 
-        if request.is_xhr:
-            return self._api_handler(ex)
+        if self._app.config['ERROR_XHR_ENABLED'] is True:
+            if request.is_xhr:
+                return self._api_handler(ex)
 
         if self._app.config['ERROR_PAGE'] is not None:
             return render_template(

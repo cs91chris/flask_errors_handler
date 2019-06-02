@@ -87,9 +87,11 @@ class ErrorHandler:
         if not isinstance(ex, HTTPException):
             # noinspection PyPep8Naming
             ExceptionClass = exc_class or InternalServerError
-            self._app.logger.error(traceback.format_exc())
+            tb = traceback.format_exc()
+            self._app.logger.error(tb)
+
             ex = ExceptionClass(
-                ex if self._app.config['DEBUG']
+                tb if self._app.config['DEBUG']
                 else self._app.config['ERROR_DEFAULT_MSG'],
                 **kwargs
             )
@@ -102,19 +104,18 @@ class ErrorHandler:
         :return:
         """
         ex = self.normalize(ex)
-        _type = ex.type if hasattr(ex, 'type') else 'about:blank'
-        _instance = ex.instance if hasattr(ex, 'instance') else 'about:blank'
 
         @self._response
         def _response():
+            status_code = ex.code if hasattr(ex, 'code') else 500
             return dict(
-                type=_type,
-                title=ex.name,
-                detail=ex.description,
-                status=ex.code,
-                instance=_instance,
-                data=ex.response
-            ), ex.code
+                type=ex.type if hasattr(ex, 'type') else 'about:blank',
+                title=ex.name if hasattr(ex, 'name') else self._app.config['ERROR_DEFAULT_MSG'],
+                detail=ex.description if hasattr(ex, 'description') else None,
+                instance=ex.instance if hasattr(ex, 'instance') else 'about:blank',
+                data=ex.response if hasattr(ex, 'response') else None,
+                status=status_code
+            ), status_code
 
         return _response()
 

@@ -1,6 +1,8 @@
 from flask import request
 from flask import make_response
 
+from warnings import warn
+
 
 class ErrorDispatcher(object):
     def __init__(self, app):
@@ -54,9 +56,7 @@ class SubdomainDispatcher(ErrorDispatcher):
                     for k, v in (handler or {}).items():
                         return v(exc)
         else:
-            self._app.logger.warning(
-                "You must set 'SERVER_NAME' in order to use {}".format(self.__class__.__name__)
-            )
+            warn("You must set 'SERVER_NAME' in order to use {}".format(self.__class__.__name__))
 
         # only in exceptional cases
         return super().default(exc)

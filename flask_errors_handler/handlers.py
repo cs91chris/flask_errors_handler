@@ -10,8 +10,8 @@ from werkzeug.routing import RequestRedirect
 from werkzeug.exceptions import HTTPException
 from werkzeug.exceptions import default_exceptions
 
-from .dispatchers import ErrorDispatcher
 from .exception import ApiProblem
+from .dispatchers import ErrorDispatcher
 
 
 def default_response_builder(f):

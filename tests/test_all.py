@@ -2,6 +2,7 @@ import pytest
 
 from flask import Flask
 from flask import abort
+from flask import Response
 from flask import Blueprint
 
 from werkzeug.exceptions import BadRequest
@@ -22,8 +23,8 @@ def app():
     _app.config['ERROR_PAGE'] = 'error.html'
 
     web = Blueprint('web', __name__)
-    custom = Blueprint('custom', __name__, subdomain='api')
     test_bp = Blueprint('test_bp', __name__)
+    custom = Blueprint('custom', __name__, subdomain='api')
 
     error.init_app(_app)
     error.api_register(_app)
@@ -41,6 +42,14 @@ def app():
     @_app.route('/api')
     def index():
         abort(500, 'Error from app')
+
+    @_app.route('/api/response')
+    def response():
+        abort(500, response=Response("response"))
+
+    @_app.route('/permanent/')
+    def permanent():
+        return 'redirected'
 
     @_app.route('/api/error')
     def api_error():
@@ -89,7 +98,7 @@ def test_api(client):
     assert data['detail'] is not None
     assert data['status'] == 500
     assert data['instance'] == 'about:blank'
-    assert data['data'] is None
+    assert data['response'] is None
 
 
 def test_api_error(client):
@@ -119,6 +128,7 @@ def test_web_error(client):
 def test_custom(client, app):
     res = client.get('/custom', base_url='http://api.' + app.config['SERVER_NAME'])
     assert res.status_code == 404
+    print(res.headers)
     assert res.headers.get('Content-Type') == 'text/html'
 
 
@@ -152,3 +162,14 @@ def test_dispatch_default(client):
     res = client.post('/testbp/test')
     assert res.status_code == 405
     assert 'text/plain' in res.headers['Content-Type']
+
+
+def test_permanent_redirect(client):
+    res = client.get('/permanent')
+    assert res.status_code == 301
+
+
+def test_response(client):
+    res = client.get('/api/response')
+    assert res.status_code == 500
+    assert res.data == b'response'

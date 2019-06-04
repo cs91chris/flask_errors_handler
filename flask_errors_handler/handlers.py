@@ -6,11 +6,12 @@ from flask import request
 from flask import Response
 from flask import render_template
 
+from werkzeug.routing import RequestRedirect
 from werkzeug.exceptions import HTTPException
 from werkzeug.exceptions import default_exceptions
-from werkzeug.exceptions import InternalServerError
 
 from .dispatchers import ErrorDispatcher
+from .exception import ApiProblem
 
 
 def default_response_builder(f):
@@ -21,33 +22,41 @@ def default_response_builder(f):
     """
     @wraps(f)
     def wrapper(*args, **kwargs):
-        r, s = f(*args, **kwargs)
+        r, s, h = f(*args, **kwargs)
         m = 'application/problem+json'
-        return Response(json.dumps(r), status=s, mimetype=m)
+        return Response(json.dumps(r), status=s, headers=h, mimetype=m)
     return wrapper
 
 
 class ErrorHandler:
-    def __init__(self, app=None, response=None):
+    def __init__(self, app=None, response=None, exc_class=None):
         """
 
         :param app:
         :param response: decorator
+        :param exc_class: subclass of ApiProblem
         """
         self._app = None
         self._response = None
+        self._exc_class = None
 
         if app is not None:
-            self.init_app(app, response)
+            self.init_app(app, response, exc_class)
 
-    def init_app(self, app, response=None):
+    def init_app(self, app, response=None, exc_class=None):
         """
 
         :param app:
         :param response: decorator
+        :param exc_class: subclass of ApiProblem
         """
         self._app = app
         self._response = response or default_response_builder
+        self._exc_class = exc_class or ApiProblem
+
+        if not issubclass(self._exc_class, ApiProblem):
+            raise AttributeError("exc_class argument must extend ApiProblem class")
+
         self._app.config.setdefault('ERROR_PAGE', None)
         self._app.config.setdefault('ERROR_XHR_ENABLED', True)
         self._app.config.setdefault('ERROR_DEFAULT_MSG', 'Unhandled Exception')
@@ -81,21 +90,32 @@ class ErrorHandler:
         """
 
         :param ex: Exception
-        :param exc_class: custom Exception class
+        :param exc_class: overrides self._exc_class
         :return: new Exception instance of HTTPException
         """
-        if not isinstance(ex, HTTPException):
-            # noinspection PyPep8Naming
-            ExceptionClass = exc_class or InternalServerError
+        # noinspection PyPep8Naming
+        ExceptionClass = exc_class or self._exc_class
+
+        if not isinstance(ex, ExceptionClass):
             tb = traceback.format_exc()
             self._app.logger.error(tb)
 
-            ex = ExceptionClass(
+            _ex = ExceptionClass(
                 tb if self._app.config['DEBUG']
                 else self._app.config['ERROR_DEFAULT_MSG'],
                 **kwargs
             )
-        return ex
+
+            if isinstance(ex, HTTPException):
+                _ex.code = ex.code
+                _ex.description = ex.description
+                _ex.response = ex.response if hasattr(ex, 'response') else None
+        else:
+            _ex = ex
+
+        if isinstance(ex, RequestRedirect):
+            _ex.headers.update(dict(Location=ex.new_url))
+        return _ex
 
     def _api_handler(self, ex):
         """
@@ -105,17 +125,23 @@ class ErrorHandler:
         """
         ex = self.normalize(ex)
 
+        if hasattr(ex, 'response'):
+            response_data = ex.response
+            if isinstance(response_data, Response):
+                return ex.response, ex.code
+        else:
+            response_data = None
+
         @self._response
         def _response():
-            status_code = ex.code if hasattr(ex, 'code') else 500
             return dict(
-                type=ex.type if hasattr(ex, 'type') else 'about:blank',
-                title=ex.name if hasattr(ex, 'name') else self._app.config['ERROR_DEFAULT_MSG'],
-                detail=ex.description if hasattr(ex, 'description') else None,
-                instance=ex.instance if hasattr(ex, 'instance') else 'about:blank',
-                data=ex.response if hasattr(ex, 'response') else None,
-                status=status_code
-            ), status_code
+                type=ex.type,
+                title=ex.name,
+                detail=ex.description,
+                instance=ex.instance,
+                response=response_data,
+                status=ex.code
+            ), ex.code, ex.headers
 
         return _response()
 

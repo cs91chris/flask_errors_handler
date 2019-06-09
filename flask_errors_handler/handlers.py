@@ -86,34 +86,35 @@ class ErrorHandler(DefaultNormalizeMixin):
             return wrapper()
         return _register
 
-    def normalize(self, ex, **kwargs):
+    def normalize(self, ex, exc_class=None, **kwargs):
         """
 
         :param ex: Exception
+        :param exc_class: overrides self._exc_class
         :return: new Exception instance of HTTPException
         """
         # noinspection PyPep8Naming
-        ExceptionClass = self._exc_class
-        ex = super().normalize(ex)
+        ExceptionClass = exc_class or self._exc_class
+        ex = super().normalize(ex, exc_class)
 
-        if not isinstance(ex, ExceptionClass):
-            tb = traceback.format_exc()
-
-            _ex = ExceptionClass(
-                tb if self._app.config['DEBUG']
-                else self._app.config['ERROR_DEFAULT_MSG'],
-                **kwargs
-            )
-
-            if isinstance(ex, HTTPException):
-                _ex.code = ex.code
-                _ex.description = ex.description
-                _ex.response = ex.response if hasattr(ex, 'response') else None
-                _ex.headers.update(**(ex.headers if hasattr(ex, 'headers') else {}))
-            else:
-                self._app.logger.error(tb)
-        else:
+        if isinstance(ex, ExceptionClass):
             return ex
+
+        tb = traceback.format_exc()
+
+        _ex = ExceptionClass(
+            tb if self._app.config['DEBUG']
+            else self._app.config['ERROR_DEFAULT_MSG'],
+            **kwargs
+        )
+
+        if isinstance(ex, HTTPException):
+            _ex.code = ex.code
+            _ex.description = ex.description
+            _ex.response = ex.response if hasattr(ex, 'response') else None
+            _ex.headers.update(**(ex.headers if hasattr(ex, 'headers') else {}))
+        else:
+            self._app.logger.error(tb)
         return _ex
 
     def _api_handler(self, ex):

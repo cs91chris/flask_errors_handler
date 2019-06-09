@@ -11,8 +11,8 @@ from setuptools import setup
 from setuptools import find_packages
 from setuptools.command.test import test
 
-from flask_errors_handler import __version__
 from flask_errors_handler import __author__
+from flask_errors_handler import __version__
 
 
 author, email = __author__.split()
@@ -44,7 +44,7 @@ setup(
     include_package_data=True,
     platforms='any',
     install_requires=[
-        'Flask==1.0.2'
+        'Flask==1.0.*'
     ],
     tests_require=[
         'pytest==4.5.0',

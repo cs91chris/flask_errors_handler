@@ -6,19 +6,19 @@ from flask import request
 from flask import Response
 from flask import render_template
 
-from werkzeug.routing import RequestRedirect
 from werkzeug.exceptions import HTTPException
 from werkzeug.exceptions import default_exceptions
 
 from .exception import ApiProblem
 from .dispatchers import ErrorDispatcher
+from .normalize import DefaultNormalizeMixin
 
 
 def default_response_builder(f):
     """
 
-    :param f: function that returns dict or Response object and status code
-    :return: flask response  of decorated function
+    :param f: function that returns dict response, status code and headers dict
+    :return: flask response of decorated function
     """
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -28,7 +28,7 @@ def default_response_builder(f):
     return wrapper
 
 
-class ErrorHandler:
+class ErrorHandler(DefaultNormalizeMixin):
     def __init__(self, app=None, response=None, exc_class=None):
         """
 
@@ -51,8 +51,8 @@ class ErrorHandler:
         :param exc_class: subclass of ApiProblem
         """
         self._app = app
-        self._response = response or default_response_builder
         self._exc_class = exc_class or ApiProblem
+        self._response = response or default_response_builder
 
         if not issubclass(self._exc_class, ApiProblem):
             raise AttributeError("exc_class argument must extend ApiProblem class")
@@ -86,19 +86,18 @@ class ErrorHandler:
             return wrapper()
         return _register
 
-    def normalize(self, ex, exc_class=None, **kwargs):
+    def normalize(self, ex, **kwargs):
         """
 
         :param ex: Exception
-        :param exc_class: overrides self._exc_class
         :return: new Exception instance of HTTPException
         """
         # noinspection PyPep8Naming
-        ExceptionClass = exc_class or self._exc_class
+        ExceptionClass = self._exc_class
+        ex = super().normalize(ex)
 
         if not isinstance(ex, ExceptionClass):
             tb = traceback.format_exc()
-            self._app.logger.error(tb)
 
             _ex = ExceptionClass(
                 tb if self._app.config['DEBUG']
@@ -110,11 +109,11 @@ class ErrorHandler:
                 _ex.code = ex.code
                 _ex.description = ex.description
                 _ex.response = ex.response if hasattr(ex, 'response') else None
+                _ex.headers.update(**(ex.headers if hasattr(ex, 'headers') else {}))
+            else:
+                self._app.logger.error(tb)
         else:
-            _ex = ex
-
-        if isinstance(ex, RequestRedirect):
-            _ex.headers.update(dict(Location=ex.new_url))
+            return ex
         return _ex
 
     def _api_handler(self, ex):
@@ -125,22 +124,18 @@ class ErrorHandler:
         """
         ex = self.normalize(ex)
 
-        if hasattr(ex, 'response'):
-            response_data = ex.response
-            if isinstance(response_data, Response):
-                return ex.response, ex.code
-        else:
-            response_data = None
+        if isinstance(ex.response, Response):
+            return ex.response, ex.code
 
         @self._response
         def _response():
             return dict(
                 type=ex.type,
                 title=ex.name,
+                status=ex.code,
                 detail=ex.description,
                 instance=ex.instance,
-                response=response_data,
-                status=ex.code
+                response=ex.response
             ), ex.code, ex.headers
 
         return _response()

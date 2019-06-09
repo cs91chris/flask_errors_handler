@@ -5,8 +5,6 @@ from flask import abort
 from flask import Response
 from flask import Blueprint
 
-from werkzeug.exceptions import BadRequest
-
 from flask_errors_handler import ErrorHandler
 from flask_errors_handler import DefaultDispatcher
 from flask_errors_handler import SubdomainDispatcher
@@ -32,7 +30,7 @@ def app():
 
     @test_bp.route('/test')
     def test():
-        exc = error.normalize(NameError('custom error'), exc_class=BadRequest)
+        exc = error.normalize(NameError('custom error'))
         abort(exc.code, exc.description)
 
     @error.register(custom)
@@ -87,6 +85,12 @@ def test_app_runs(client):
     assert res.status_code == 404
 
 
+def test_method_not_allowed(client):
+    res = client.post('/api')
+    assert res.status_code == 405
+    assert 'Allow' in res.headers
+
+
 def test_api(client):
     res = client.get('/api')
     assert res.status_code == 500
@@ -128,13 +132,12 @@ def test_web_error(client):
 def test_custom(client, app):
     res = client.get('/custom', base_url='http://api.' + app.config['SERVER_NAME'])
     assert res.status_code == 404
-    print(res.headers)
     assert res.headers.get('Content-Type') == 'text/html'
 
 
 def test_custom_error(client):
     res = client.get('/testbp/test')
-    assert res.status_code == 400
+    assert res.status_code == 500
     assert res.headers.get('Content-Type') == 'application/problem+json'
 
 
@@ -166,7 +169,8 @@ def test_dispatch_default(client):
 
 def test_permanent_redirect(client):
     res = client.get('/permanent')
-    assert res.status_code == 301
+    assert res.status_code in (301, 308)
+    assert 'Location' in res.headers
 
 
 def test_response(client):

@@ -134,9 +134,9 @@ class ErrorHandler(DefaultNormalizeMixin):
                 type=ex.type,
                 title=ex.name,
                 status=ex.code,
-                detail=ex.description,
                 instance=ex.instance,
-                response=ex.response
+                response=ex.response,
+                detail=ex.description
             ), ex.code, ex.headers
 
         return _response()

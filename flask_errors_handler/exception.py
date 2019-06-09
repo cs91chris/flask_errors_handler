@@ -55,6 +55,32 @@ class ApiProblem(InternalServerError):
     correct the problem, rather than giving debugging information.
     """
 
+    headers = {}
+    response = None
     type = 'about:blank'
     instance = 'about:blank'
-    headers = {}
+
+    def __init__(self, description=None, response=None, **kwargs):
+        """
+
+        :param description:
+        :param response:
+        :param data:
+        """
+        InternalServerError.__init__(self, description, response)
+
+        self.type = kwargs.get('type', self.type)
+        self.instance = kwargs.get('instance', self.instance)
+
+        h = kwargs.get('headers', {})
+        r = kwargs.get('response')
+
+        if isinstance(self.headers, dict) and isinstance(h, dict):
+            self.headers.update(**h)
+        else:
+            self.headers = h
+
+        if isinstance(self.response, dict) and isinstance(r, dict):
+            self.response.update(**r)
+        else:
+            self.response = r

@@ -11,22 +11,25 @@ from setuptools import setup
 from setuptools import find_packages
 from setuptools.command.test import test
 
-from flask_errors_handler import __author__
+from flask_errors_handler import __author_info__
 from flask_errors_handler import __version__
 
 
-author, email = __author__.split()
-email = email.lstrip('<').rstrip('>')
-
-with open("README.rst", "r") as fh:
+with open("README.rst") as fh:
     long_description = fh.read()
 
 
 class PyTest(test):
     def finalize_options(self):
+        """
+
+        """
         test.finalize_options(self)
 
     def run_tests(self):
+        """
+
+        """
         sys.exit(pytest.main(['tests']))
 
 
@@ -35,8 +38,8 @@ setup(
     version=__version__,
     url='https://github.com/cs91chris/flask_errors_handler',
     license='MIT',
-    author='cs91chris',
-    author_email='cs91chris@voidbrain.me',
+    author=__author_info__['name'],
+    author_email=__author_info__['email'],
     description='Customizable errors handler for flask application and blueprints',
     long_description=long_description,
     packages=find_packages(),
@@ -44,7 +47,7 @@ setup(
     include_package_data=True,
     platforms='any',
     install_requires=[
-        'Flask==1.0.*'
+        'Flask==1.1.*'
     ],
     tests_require=[
         'pytest==4.5.0',

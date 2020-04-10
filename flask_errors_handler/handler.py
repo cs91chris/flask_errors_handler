@@ -1,13 +1,8 @@
 import traceback
 from functools import wraps
 
-from flask import json
-from flask import request
-from flask import Response
-from flask import render_template
-
-from werkzeug.exceptions import HTTPException
-from werkzeug.exceptions import default_exceptions
+import flask
+from werkzeug.exceptions import HTTPException, default_exceptions
 
 from .exception import ApiProblem
 from .dispatchers import ErrorDispatcher
@@ -24,7 +19,7 @@ def default_response_builder(f):
     def wrapper(*args, **kwargs):
         r, s, h = f(*args, **kwargs)
         m = 'application/problem+json'
-        return Response(json.dumps(r), status=s, headers=h, mimetype=m)
+        return flask.Response(flask.json.dumps(r), status=s, headers=h, mimetype=m)
     return wrapper
 
 
@@ -125,7 +120,7 @@ class ErrorHandler(DefaultNormalizeMixin):
         """
         ex = self.normalize(ex)
 
-        if isinstance(ex.response, Response):
+        if isinstance(ex.response, flask.Response):
             return ex.response, ex.code
 
         @self._response
@@ -150,11 +145,11 @@ class ErrorHandler(DefaultNormalizeMixin):
         ex = self.normalize(ex)
 
         if self._app.config['ERROR_XHR_ENABLED'] is True:
-            if request.is_xhr:
+            if flask.request.is_xhr:
                 return self._api_handler(ex)
 
         if self._app.config['ERROR_PAGE'] is not None:
-            return render_template(
+            return flask.render_template(
                 self._app.config['ERROR_PAGE'],
                 error=ex
             ), ex.code

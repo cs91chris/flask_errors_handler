@@ -54,7 +54,6 @@ class ApiProblem(InternalServerError):
     The "detail" member, if present, ought to focus on helping the client
     correct the problem, rather than giving debugging information.
     """
-
     headers = {}
     response = None
     type = 'about:blank'

@@ -1,7 +1,6 @@
 from warnings import warn
 
-from flask import request
-from flask import make_response
+import flask
 
 
 class ErrorDispatcher(object):
@@ -19,7 +18,7 @@ class ErrorDispatcher(object):
         :param exc:
         :return:
         """
-        resp = make_response('{}: {}'.format(exc.name, exc.description), exc.code)
+        resp = flask.make_response('{}: {}'.format(exc.name, exc.description), exc.code)
         resp.headers['Content-Type'] = 'text/plain'
         return resp
 
@@ -49,7 +48,7 @@ class SubdomainDispatcher(ErrorDispatcher):
         """
         len_domain = len(self._app.config.get('SERVER_NAME') or '')
         if len_domain > 0:
-            subdomain = request.host[:-len_domain].rstrip('.') or None
+            subdomain = flask.request.host[:-len_domain].rstrip('.') or None
             for bp_name, bp in self._app.blueprints.items():
                 if subdomain == bp.subdomain:
                     handler = self._app.error_handler_spec.get(bp_name, {}).get(exc.code)
@@ -69,7 +68,7 @@ class URLPrefixDispatcher(ErrorDispatcher):
         :return:
         """
         for bp_name, bp in self._app.blueprints.items():
-            if request.path.startswith(bp.url_prefix or '/'):
+            if flask.request.path.startswith(bp.url_prefix or '/'):
                 handler = self._app.error_handler_spec.get(bp_name, {}).get(exc.code)
                 for k, v in (handler or {}).items():
                     return v(exc)

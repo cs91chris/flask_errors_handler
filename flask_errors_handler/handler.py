@@ -145,7 +145,8 @@ class ErrorHandler(DefaultNormalizeMixin):
         ex = self.normalize(ex)
 
         if self._app.config['ERROR_XHR_ENABLED'] is True:
-            if flask.request.is_xhr:
+            # check if request is XHR
+            if flask.request.headers.get('X-Requested-With', '').lower() == "xmlhttprequest":
                 return self._api_handler(ex)
 
         if self._app.config['ERROR_PAGE'] is not None:

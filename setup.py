@@ -1,19 +1,14 @@
 """
 Flask-ErrorsHandler
 -------------
-
-Customizable errors handler for flask application and blueprints
 """
 import sys
-import pytest
 
-from setuptools import setup
-from setuptools import find_packages
+import pytest
+from setuptools import setup, find_packages
 from setuptools.command.test import test
 
-from flask_errors_handler import __author_info__
-from flask_errors_handler import __version__
-
+from flask_errors_handler import __author_info__, __version__
 
 with open("README.rst") as fh:
     long_description = fh.read()
@@ -50,8 +45,8 @@ setup(
         'Flask==1.1.*'
     ],
     tests_require=[
-        'pytest==4.5.0',
-        'pytest-cov==2.7.1'
+        'pytest==5.4.*',
+        'pytest-cov==2.8.*'
     ],
     cmdclass={'test': PyTest},
     test_suite='tests',

@@ -24,7 +24,7 @@ There are 2 concrete implementation:
   of B in both case if B is registered after A.
 
 Moreover you can create you own dispatcher by extending ``ErrorDispatcher`` class and implementing ``dispatch`` method.
-Only the *last* ErrorDispatcher registered is execute. This is the best solution I have found, suggestions are welcome.
+Only the *last* ErrorDispatcher registered is executed. This is the best solution I have found, suggestions are welcome.
 
 
 QuickStart

@@ -17,9 +17,25 @@ def default_response_builder(f):
     """
     @wraps(f)
     def wrapper(*args, **kwargs):
+        """
+
+        :param args:
+        :param kwargs:
+        :return:
+        """
         r, s, h = f(*args, **kwargs)
-        m = 'application/problem+json'
-        return flask.Response(flask.json.dumps(r), status=s, headers=h, mimetype=m)
+
+        m = h.get('Content-Type')
+        if ApiProblem.ct_id not in m or 'json' not in m:
+            m = 'application/{}+json'.format(ApiProblem.ct_id)
+
+        return flask.Response(
+            flask.json.dumps(r),
+            status=s,
+            headers=h,
+            mimetype=m
+        )
+
     return wrapper
 
 
@@ -50,7 +66,7 @@ class ErrorHandler(DefaultNormalizeMixin):
         self._response = response or default_response_builder
 
         if not issubclass(self._exc_class, ApiProblem):
-            raise AttributeError("exc_class argument must extend ApiProblem class")
+            raise TypeError("exc_class argument must extend ApiProblem class")
 
         self._app.config.setdefault('ERROR_PAGE', None)
         self._app.config.setdefault('ERROR_XHR_ENABLED', True)
@@ -73,6 +89,9 @@ class ErrorHandler(DefaultNormalizeMixin):
             """
             @wraps(hderr)
             def wrapper():
+                """
+
+                """
                 for code in default_exceptions.keys():
                     bp.errorhandler(code)(hderr)
 
@@ -125,14 +144,12 @@ class ErrorHandler(DefaultNormalizeMixin):
 
         @self._response
         def _response():
-            return dict(
-                type=ex.type,
-                title=ex.name,
-                status=ex.code,
-                instance=ex.instance,
-                response=ex.response,
-                detail=ex.description
-            ), ex.code, ex.headers
+            """
+
+            :return:
+            """
+            r, s, h = ex.prepare_response()
+            return r, s, ex.fix_headers()
 
         return _response()
 
@@ -155,8 +172,10 @@ class ErrorHandler(DefaultNormalizeMixin):
                 error=ex
             ), ex.code
 
-        return str(ex) if self._app.config['DEBUG'] \
-            else self._app.config['ERROR_DEFAULT_MSG'], 500
+        if self._app.config['DEBUG']:
+            return str(ex)
+        else:
+            return self._app.config['ERROR_DEFAULT_MSG'], 500
 
     # noinspection PyMethodMayBeStatic
     def default_register(self, bp):

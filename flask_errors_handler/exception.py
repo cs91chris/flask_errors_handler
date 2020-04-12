@@ -56,30 +56,57 @@ class ApiProblem(InternalServerError):
     """
     headers = {}
     response = None
-    type = 'about:blank'
+    type = 'https://httpstatuses.com/{}'
     instance = 'about:blank'
+    ct_id = 'problem'
 
     def __init__(self, description=None, response=None, **kwargs):
         """
 
         :param description:
         :param response:
+
         :param data:
         """
-        InternalServerError.__init__(self, description, response)
+        super().__init__(description, response)
 
-        self.type = kwargs.get('type', self.type)
+        self.type = kwargs.get('type', self.type.format(self.code))
         self.instance = kwargs.get('instance', self.instance)
 
         h = kwargs.get('headers', {})
-        r = kwargs.get('response')
 
-        if isinstance(self.headers, dict) and isinstance(h, dict):
+        try:
             self.headers.update(**h)
-        else:
+        except AttributeError:
             self.headers = h
 
-        if isinstance(self.response, dict) and isinstance(r, dict):
-            self.response.update(**r)
+    def prepare_response(self):
+        """
+
+        """
+        return dict(
+            type=self.type,
+            title=self.name,
+            status=self.code,
+            instance=self.instance,
+            response=self.response,
+            detail=self.description
+        ), self.code, self.fix_headers()
+
+    def fix_headers(self):
+        """
+
+        :return:
+        """
+        ct = self.headers.get('Content-Type')
+        if ct:
+            if ApiProblem.ct_id not in ct:
+                self.headers.update({
+                    'Content-Type': "/{}".format(ApiProblem.ct_id).join(ct.split('/', maxsplit=1))
+                })
         else:
-            self.response = r
+            self.headers.update({
+                'Content-Type': 'x-application/{}'.format(self.ct_id)
+            })
+
+        return self.headers

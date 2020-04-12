@@ -40,8 +40,11 @@ class MethodNotAllowedMixin(BaseNormalize):
         :return:
         """
         if isinstance(ex, MethodNotAllowed):
-            ex.response = dict(Allow=ex.valid_methods)
-            ex.headers = dict(Allow=", ".join(ex.valid_methods))
+            try:
+                ex.headers = dict(Allow=", ".join(ex.valid_methods))
+                ex.response = dict(Allow=ex.valid_methods)
+            except TypeError:
+                pass
 
         return super().normalize(ex, exc_class)
 

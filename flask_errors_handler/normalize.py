@@ -6,6 +6,7 @@ class BaseNormalize(object):
     def normalize(self, ex, exc_class=None, **kwargs):
         """
         Child class must return super().normalize() so as to keep the chain of Mixins
+
         :param ex: input exception
         :param exc_class: class of output exception
         :return:
@@ -56,6 +57,7 @@ class DefaultNormalizeMixin(
     def normalize(self, ex, exc_class=None, **kwargs):
         """
         Collects the default normalize Mixins used in ErrorHandler
+
         :param ex:
         :param exc_class:
         :param kwargs:

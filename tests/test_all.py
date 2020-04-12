@@ -62,6 +62,14 @@ def app():
         _app.config['ERROR_PAGE'] = None
         abort(500, 'Error from web blueprint')
 
+    @custom.route('/methodnotallowed/option')
+    def method_not_allowed_option():
+        abort(405, valid_methods=['GET', 'POST'])
+
+    @custom.route('/methodnotallowed')
+    def method_not_allowed_without_option():
+        abort(405)
+
     @custom.route('/custom')
     def index():
         abort(500, 'Error from custom blueprint')
@@ -97,7 +105,7 @@ def test_api(client):
     assert res.headers.get('Content-Type') == 'application/problem+json'
 
     data = res.get_json()
-    assert data['type'] == 'about:blank'
+    assert data['type'] == 'https://httpstatuses.com/500'
     assert data['title'] == 'Internal Server Error'
     assert data['detail'] is not None
     assert data['status'] == 500
@@ -127,6 +135,17 @@ def test_web_error(client):
     res = client.get('/web/web/error')
     assert res.status_code == 500
     assert res.headers.get('Content-Type') == 'text/html; charset=utf-8'
+
+
+def method_not_allowed(client):
+    res = client.get('/methodnotallowed')
+    assert res.status_code == 405
+    assert res.headers.get('Allow') is None
+
+    res = client.get('/methodnotallowed/options')
+    assert res.status_code == 405
+    assert res.headers['Allow'] == 'GET, POST'
+    assert res.get_json()['response']['Allow'] == ['GET', 'POST']
 
 
 def test_custom(client, app):

@@ -1,4 +1,4 @@
-__version_info__ = (2, 2, 3)
+__version_info__ = (2, 2, 4)
 __version__ = '.'.join(map(str, __version_info__))
 
 __author_info__ = {

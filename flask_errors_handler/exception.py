@@ -56,9 +56,9 @@ class ApiProblem(InternalServerError):
     """
     headers = {}
     response = None
-    type = 'https://httpstatuses.com/{}'
-    instance = 'about:blank'
     ct_id = 'problem'
+    instance = 'about:blank'
+    type = 'https://httpstatuses.com/{code}'
 
     def __init__(self, description=None, response=None, **kwargs):
         """
@@ -70,7 +70,7 @@ class ApiProblem(InternalServerError):
         """
         super().__init__(description, response)
 
-        self.type = kwargs.get('type', self.type.format(self.code))
+        self.type = kwargs.get('type', self.type)
         self.instance = kwargs.get('instance', self.instance)
 
         h = kwargs.get('headers', {})
@@ -85,28 +85,10 @@ class ApiProblem(InternalServerError):
 
         """
         return dict(
-            type=self.type,
+            type=self.type.format(code=self.code),
             title=self.name,
             status=self.code,
             instance=self.instance,
             response=self.response,
             detail=self.description
-        ), self.code, self.fix_headers()
-
-    def fix_headers(self):
-        """
-
-        :return:
-        """
-        ct = self.headers.get('Content-Type')
-        if ct:
-            if ApiProblem.ct_id not in ct:
-                self.headers.update({
-                    'Content-Type': "/{}".format(ApiProblem.ct_id).join(ct.split('/', maxsplit=1))
-                })
-        else:
-            self.headers.update({
-                'Content-Type': 'x-application/{}'.format(self.ct_id)
-            })
-
-        return self.headers
+        ), self.code, self.headers

@@ -25,7 +25,7 @@ def default_response_builder(f):
         """
         r, s, h = f(*args, **kwargs)
 
-        m = h.get('Content-Type')
+        m = h.get('Content-Type', '')
         if ApiProblem.ct_id not in m or 'json' not in m:
             m = 'application/{}+json'.format(ApiProblem.ct_id)
 
@@ -104,7 +104,7 @@ class ErrorHandler(DefaultNormalizeMixin):
         """
 
         :param ex: Exception
-        :param exc_class: overrides self._exc_class
+        :param exc_class: overrides ApiProblem class
         :return: new Exception instance of HTTPException
         """
         # noinspection PyPep8Naming
@@ -115,12 +115,12 @@ class ErrorHandler(DefaultNormalizeMixin):
             return ex
 
         tb = traceback.format_exc()
+        if self._app.config['DEBUG']:
+            mess = tb
+        else:
+            mess = self._app.config['ERROR_DEFAULT_MSG']
 
-        _ex = ExceptionClass(
-            tb if self._app.config['DEBUG']
-            else self._app.config['ERROR_DEFAULT_MSG'],
-            **kwargs
-        )
+        _ex = ExceptionClass(mess, **kwargs)
 
         if isinstance(ex, HTTPException):
             _ex.code = ex.code
@@ -129,6 +129,7 @@ class ErrorHandler(DefaultNormalizeMixin):
             _ex.headers.update(**(ex.headers if hasattr(ex, 'headers') else {}))
         else:
             self._app.logger.error(tb)
+
         return _ex
 
     def _api_handler(self, ex):
@@ -148,10 +149,21 @@ class ErrorHandler(DefaultNormalizeMixin):
 
             :return:
             """
-            r, s, h = ex.prepare_response()
-            return r, s, ex.fix_headers()
+            return ex.prepare_response()
 
-        return _response()
+        resp = _response()
+
+        # ugly hack in order to send the correct "api problem" content-type header in response
+        # when using a custom response builder that is not compatible
+        ct = resp.headers.get('Content-Type') or 'x-application/{}'.format(ApiProblem.ct_id)
+        if ApiProblem.ct_id not in ct:
+            if 'json' in ct or 'xml' in ct:
+                ct = "/{}+".format(ApiProblem.ct_id).join(ct.split('/', maxsplit=1))
+
+        resp.headers.update({'Content-Type': ct})
+        # end hack
+
+        return resp
 
     def _web_handler(self, ex):
         """
@@ -162,7 +174,7 @@ class ErrorHandler(DefaultNormalizeMixin):
         ex = self.normalize(ex)
 
         if self._app.config['ERROR_XHR_ENABLED'] is True:
-            # check if request is XHR
+            # check if request is XHR (for compatibility with old clients)
             if flask.request.headers.get('X-Requested-With', '').lower() == "xmlhttprequest":
                 return self._api_handler(ex)
 

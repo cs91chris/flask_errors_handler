@@ -53,6 +53,14 @@ def app():
     def api_error():
         raise NameError('exception from app')
 
+    @_app.route('/methodnotallowed/option')
+    def method_not_allowed_option():
+        abort(405, valid_methods=['GET', 'POST'])
+
+    @_app.route('/methodnotallowed')
+    def method_not_allowed_without_option():
+        abort(405)
+
     @web.route('/web')
     def index():
         abort(500, 'Error from web blueprint')
@@ -62,19 +70,11 @@ def app():
         _app.config['ERROR_PAGE'] = None
         abort(500, 'Error from web blueprint')
 
-    @custom.route('/methodnotallowed/option')
-    def method_not_allowed_option():
-        abort(405, valid_methods=['GET', 'POST'])
-
-    @custom.route('/methodnotallowed')
-    def method_not_allowed_without_option():
-        abort(405)
-
     @custom.route('/custom')
     def index():
         abort(500, 'Error from custom blueprint')
 
-    _app.register_blueprint(custom)
+    _app.register_blueprint(custom, url_prefix='/custom')
     _app.register_blueprint(web, url_prefix='/web')
     _app.register_blueprint(test_bp, url_prefix='/testbp')
 
@@ -91,12 +91,14 @@ def client(app):
 def test_app_runs(client):
     res = client.get('/')
     assert res.status_code == 404
+    assert res.get_json()['type'] == 'https://httpstatuses.com/404'
 
 
 def test_method_not_allowed(client):
     res = client.post('/api')
     assert res.status_code == 405
     assert 'Allow' in res.headers
+    assert res.get_json()['type'] == 'https://httpstatuses.com/405'
 
 
 def test_api(client):
@@ -149,7 +151,8 @@ def method_not_allowed(client):
 
 
 def test_custom(client, app):
-    res = client.get('/custom', base_url='http://api.' + app.config['SERVER_NAME'])
+    error.register_dispatcher(SubdomainDispatcher)
+    res = client.get('/custom/custom', base_url='http://api.' + app.config['SERVER_NAME'])
     assert res.status_code == 404
     assert res.headers.get('Content-Type') == 'text/html'
 
@@ -158,6 +161,7 @@ def test_custom_error(client):
     res = client.get('/testbp/test')
     assert res.status_code == 500
     assert res.headers.get('Content-Type') == 'application/problem+json'
+    assert res.get_json()['type'] == 'https://httpstatuses.com/500'
 
 
 def test_dispatch_error_web(client):

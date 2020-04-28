@@ -25,34 +25,28 @@ def default_response_builder(f):
         :return:
         """
         r, s, h = f(*args, **kwargs)
-
+        resp = flask.json.dumps(r)
         m = h.get('Content-Type', '')
-        if ApiProblem.ct_id not in m or 'json' not in m:
-            m = 'application/{}+json'.format(ApiProblem.ct_id)
 
-        return flask.Response(
-            flask.json.dumps(r),
-            status=s,
-            headers=h,
-            mimetype=m
-        )
+        if cap.config['ERROR_FORCE_CONTENT_TYPE'] is True:
+            if ApiProblem.ct_id not in m or 'json' not in m:
+                m = 'application/{}+json'.format(ApiProblem.ct_id)
 
+        return flask.Response(resp, status=s, headers=h, mimetype=m)
     return wrapper
 
 
 class ErrorHandler(DefaultNormalizeMixin):
-    def __init__(self, app=None, response=None, exc_class=None):
+    def __init__(self, app=None, **kwargs):
         """
 
         :param app:
-        :param response: decorator
-        :param exc_class: subclass of ApiProblem
         """
         self._response = None
         self._exc_class = None
 
         if app is not None:
-            self.init_app(app, response, exc_class)
+            self.init_app(app, **kwargs)
 
     def init_app(self, app, response=None, exc_class=None, dispatcher=None):
         """
@@ -71,6 +65,8 @@ class ErrorHandler(DefaultNormalizeMixin):
         app.config.setdefault('ERROR_PAGE', None)
         app.config.setdefault('ERROR_XHR_ENABLED', True)
         app.config.setdefault('ERROR_DEFAULT_MSG', 'Unhandled Exception')
+        app.config.setdefault('ERROR_FORCE_CONTENT_TYPE', True)
+        app.config.setdefault('ERROR_CONTENT_TYPES', ('json', 'xml'))
 
         if not hasattr(app, 'extensions'):
             app.extensions = dict()
@@ -83,7 +79,10 @@ class ErrorHandler(DefaultNormalizeMixin):
             if dispatcher_class:
                 self.register_dispatcher(app, dispatcher_class)
             else:
-                app.logger.warning("dispatcher '{}' not exists".format(dispatcher_class.__name__))
+                app.logger.error(
+                    "dispatcher '{}' not exists. Use one of {}".format(
+                        dispatcher, DEFAULT_DISPATCHERS.keys()
+                    ))
 
     @staticmethod
     def register(bp):
@@ -162,15 +161,13 @@ class ErrorHandler(DefaultNormalizeMixin):
 
         resp = _response()
 
-        # ugly hack in order to send the correct "api problem" content-type header in response
-        # when using a custom response builder that is not compatible
-        ct = resp.headers.get('Content-Type') or 'x-application/{}'.format(ApiProblem.ct_id)
-        if ApiProblem.ct_id not in ct:
-            if 'json' in ct or 'xml' in ct:
-                ct = "/{}+".format(ApiProblem.ct_id).join(ct.split('/', maxsplit=1))
+        if cap.config['ERROR_FORCE_CONTENT_TYPE'] is True:
+            ct = resp.headers.get('Content-Type') or 'application/{}'.format(ApiProblem.ct_id)
+            if ApiProblem.ct_id not in ct:
+                if any([i in ct for i in cap.config['ERROR_CONTENT_TYPES']]):
+                    ct = "/{}+".format(ApiProblem.ct_id).join(ct.split('/', maxsplit=1))
 
-        resp.headers.update({'Content-Type': ct})
-        # end hack
+            resp.headers.update({'Content-Type': ct})
 
         return resp
 

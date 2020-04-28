@@ -60,6 +60,19 @@ class ApiProblem(InternalServerError):
     instance = 'about:blank'
     type = 'https://httpstatuses.com/{code}'
 
+    default_html_template = '''
+        <html>
+            <head><title>{{ exc.code }}</title></head>
+            <body>
+                <h2>{{ exc.code }} - {{ exc.name }}</h2>
+                <p>Problem type: <a href="{{ exc.get_type() }}">{{ exc.get_type() }}</a></p>
+                <p>Problem specific: <a href="{{ exc.get_instance() }}">{{ exc.get_instance() }}</a></p>
+                <h3>Description</h3>
+                <p>{{ exc.get_detail() }}</p>
+            </body>
+        </html>
+        '''
+
     def __init__(self, description=None, response=None, **kwargs):
         """
 
@@ -92,3 +105,24 @@ class ApiProblem(InternalServerError):
             response=self.response,
             detail=self.description
         ), self.code, self.headers
+
+    def get_type(self):
+        """
+
+        :return:
+        """
+        return self.type.format(code=self.code)
+
+    def get_instance(self):
+        """
+
+        :return:
+        """
+        return self.instance
+
+    def get_detail(self):
+        """
+
+        :return:
+        """
+        return self.description

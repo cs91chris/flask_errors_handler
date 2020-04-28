@@ -18,9 +18,9 @@ class ErrorDispatcher(object):
         :param exc:
         :return:
         """
-        resp = flask.make_response('{}: {}'.format(exc.name, exc.description), exc.code)
-        resp.headers['Content-Type'] = 'text/plain'
-        return resp
+        return flask.render_template_string(
+            exc.default_html_template, exc=exc
+        ), exc.code
 
     def dispatch(self, exc, **kwargs):
         """
@@ -57,7 +57,7 @@ class SubdomainDispatcher(ErrorDispatcher):
         else:
             warn("You must set 'SERVER_NAME' in order to use {}".format(self.__class__.__name__))
 
-        return super().default(exc)
+        return self.default(exc)
 
 
 class URLPrefixDispatcher(ErrorDispatcher):
@@ -68,16 +68,20 @@ class URLPrefixDispatcher(ErrorDispatcher):
         :return:
         """
         for bp_name, bp in self._app.blueprints.items():
-            if flask.request.path.startswith(bp.url_prefix or '/'):
+            if not bp.url_prefix:
+                warn("You must set 'url_prefix' when instantiate Blueprint: '{}'".format(bp_name))
+                continue
+
+            if flask.request.path.startswith(bp.url_prefix):
                 handler = self._app.error_handler_spec.get(bp_name, {}).get(exc.code)
                 for k, v in (handler or {}).items():
                     return v(exc)
 
-        return super().default(exc)
+        return self.default(exc)
 
 
 DEFAULT_DISPATCHERS = {
+    'default': DefaultDispatcher,
     'subdomain': SubdomainDispatcher,
     'urlprefix': URLPrefixDispatcher,
-    'default': DefaultDispatcher,
 }

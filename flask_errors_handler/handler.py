@@ -3,6 +3,7 @@ from functools import wraps
 
 import flask
 from flask import current_app as cap
+from jinja2 import TemplateError
 from werkzeug.exceptions import HTTPException, default_exceptions
 
 from .exception import ApiProblem
@@ -54,7 +55,7 @@ class ErrorHandler(DefaultNormalizeMixin):
         :param app:
         :param response: decorator
         :param exc_class: subclass of ApiProblem
-        :param dispatcher:
+        :param dispatcher: ErrorDispatcher instance or default configured string name
         """
         self._exc_class = exc_class or ApiProblem
         self._response = response or default_response_builder
@@ -62,7 +63,7 @@ class ErrorHandler(DefaultNormalizeMixin):
         if not issubclass(self._exc_class, ApiProblem):
             raise TypeError("exc_class argument must extend ApiProblem class")
 
-        app.config.setdefault('ERROR_PAGE', None)
+        app.config.setdefault('ERROR_PAGE', 'error.html')
         app.config.setdefault('ERROR_XHR_ENABLED', True)
         app.config.setdefault('ERROR_DEFAULT_MSG', 'Unhandled Exception')
         app.config.setdefault('ERROR_FORCE_CONTENT_TYPE', True)
@@ -184,16 +185,10 @@ class ErrorHandler(DefaultNormalizeMixin):
             if flask.request.headers.get('X-Requested-With', '').lower() == "xmlhttprequest":
                 return self._api_handler(ex)
 
-        if cap.config['ERROR_PAGE'] is not None:
-            return flask.render_template(
-                cap.config['ERROR_PAGE'],
-                error=ex
-            ), ex.code
-
-        if cap.config['DEBUG']:
-            return str(ex)
-        else:
-            return cap.config['ERROR_DEFAULT_MSG'], 500
+        try:
+            return flask.render_template(cap.config['ERROR_PAGE'], error=ex), ex.code
+        except TemplateError:
+            return flask.render_template_string(ex.default_html_template, exc=ex), ex.code
 
     # noinspection PyMethodMayBeStatic
     def default_register(self, bp):

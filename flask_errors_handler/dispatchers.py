@@ -74,3 +74,10 @@ class URLPrefixDispatcher(ErrorDispatcher):
                     return v(exc)
 
         return super().default(exc)
+
+
+DEFAULT_DISPATCHERS = {
+    'subdomain': SubdomainDispatcher,
+    'urlprefix': URLPrefixDispatcher,
+    'default': DefaultDispatcher,
+}

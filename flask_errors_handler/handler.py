@@ -2,11 +2,12 @@ import traceback
 from functools import wraps
 
 import flask
+from flask import current_app as cap
 from werkzeug.exceptions import HTTPException, default_exceptions
 
 from .exception import ApiProblem
-from .dispatchers import ErrorDispatcher
 from .normalize import DefaultNormalizeMixin
+from .dispatchers import ErrorDispatcher, DEFAULT_DISPATCHERS
 
 
 def default_response_builder(f):
@@ -47,34 +48,42 @@ class ErrorHandler(DefaultNormalizeMixin):
         :param response: decorator
         :param exc_class: subclass of ApiProblem
         """
-        self._app = None
         self._response = None
         self._exc_class = None
 
         if app is not None:
             self.init_app(app, response, exc_class)
 
-    def init_app(self, app, response=None, exc_class=None):
+    def init_app(self, app, response=None, exc_class=None, dispatcher=None):
         """
 
         :param app:
         :param response: decorator
         :param exc_class: subclass of ApiProblem
+        :param dispatcher:
         """
-        self._app = app
         self._exc_class = exc_class or ApiProblem
         self._response = response or default_response_builder
 
         if not issubclass(self._exc_class, ApiProblem):
             raise TypeError("exc_class argument must extend ApiProblem class")
 
-        self._app.config.setdefault('ERROR_PAGE', None)
-        self._app.config.setdefault('ERROR_XHR_ENABLED', True)
-        self._app.config.setdefault('ERROR_DEFAULT_MSG', 'Unhandled Exception')
+        app.config.setdefault('ERROR_PAGE', None)
+        app.config.setdefault('ERROR_XHR_ENABLED', True)
+        app.config.setdefault('ERROR_DEFAULT_MSG', 'Unhandled Exception')
 
         if not hasattr(app, 'extensions'):
             app.extensions = dict()
         app.extensions['errors_handler'] = self
+
+        if isinstance(dispatcher, ErrorDispatcher):
+            self.register_dispatcher(app, dispatcher)
+        elif dispatcher:
+            dispatcher_class = DEFAULT_DISPATCHERS.get(dispatcher)
+            if dispatcher_class:
+                self.register_dispatcher(app, dispatcher_class)
+            else:
+                app.logger.warning("dispatcher '{}' not exists".format(dispatcher_class.__name__))
 
     @staticmethod
     def register(bp):
@@ -115,10 +124,10 @@ class ErrorHandler(DefaultNormalizeMixin):
             return ex
 
         tb = traceback.format_exc()
-        if self._app.config['DEBUG']:
+        if cap.config['DEBUG']:
             mess = tb
         else:
-            mess = self._app.config['ERROR_DEFAULT_MSG']
+            mess = cap.config['ERROR_DEFAULT_MSG']
 
         _ex = ExceptionClass(mess, **kwargs)
 
@@ -128,7 +137,7 @@ class ErrorHandler(DefaultNormalizeMixin):
             _ex.response = ex.response if hasattr(ex, 'response') else None
             _ex.headers.update(**(ex.headers if hasattr(ex, 'headers') else {}))
         else:
-            self._app.logger.error(tb)
+            cap.logger.error(tb)
 
         return _ex
 
@@ -173,21 +182,21 @@ class ErrorHandler(DefaultNormalizeMixin):
         """
         ex = self.normalize(ex)
 
-        if self._app.config['ERROR_XHR_ENABLED'] is True:
+        if cap.config['ERROR_XHR_ENABLED'] is True:
             # check if request is XHR (for compatibility with old clients)
             if flask.request.headers.get('X-Requested-With', '').lower() == "xmlhttprequest":
                 return self._api_handler(ex)
 
-        if self._app.config['ERROR_PAGE'] is not None:
+        if cap.config['ERROR_PAGE'] is not None:
             return flask.render_template(
-                self._app.config['ERROR_PAGE'],
+                cap.config['ERROR_PAGE'],
                 error=ex
             ), ex.code
 
-        if self._app.config['DEBUG']:
+        if cap.config['DEBUG']:
             return str(ex)
         else:
-            return self._app.config['ERROR_DEFAULT_MSG'], 500
+            return cap.config['ERROR_DEFAULT_MSG'], 500
 
     # noinspection PyMethodMayBeStatic
     def default_register(self, bp):
@@ -211,21 +220,22 @@ class ErrorHandler(DefaultNormalizeMixin):
         """
         ErrorHandler.register(bp)(self._web_handler)
 
-    def register_dispatcher(self, dispatcher, codes=None):
+    def register_dispatcher(self, app, dispatcher, codes=None):
         """
 
+        :param app:
         :param dispatcher:
         :param codes:
         """
         codes = codes or (404, 405)
 
         for c in codes:
-            @self._app.errorhandler(c)
+            @app.errorhandler(c)
             def error_handler(exc):
                 """
 
                 :param exc:
                 :return:
                 """
-                d = dispatcher(self._app)
+                d = dispatcher(app)
                 return d.dispatch(self.normalize(exc))

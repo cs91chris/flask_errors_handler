@@ -26,6 +26,12 @@ There are 2 concrete implementation:
 Moreover you can create you own dispatcher by extending ``ErrorDispatcher`` class and implementing ``dispatch`` method.
 Only the *last* ErrorDispatcher registered is executed. This is the best solution I have found, suggestions are welcome.
 
+Notices:
+
+1. In order to use correctly dispatcher you must set prefix or subdomain in Blueprints constructor, see example below.
+2. If you use dispatcher do not register an handler to app object because it overwrites dispatcher.
+3. When using a dispatcher you should use failure handler on app to catch hunandled exceptions
+
 
 QuickStart
 ~~~~~~~~~~
@@ -43,45 +49,50 @@ Example usage
 
 .. code:: python
 
-    from flask import Flask
-    from flask import abort
-    from flask import Blueprint
+    import flask
 
     from flask_errors_handler import ErrorHandler
 
+    app = flask.Flask(__name__)
+    error = ErrorHandler(app, dispatcher='urlprefix')
 
-    app = Flask(__name__)
-    app.config['ERROR_PAGE'] = 'error.html'
+    api = flask.Blueprint('api', __name__, url_prefix='/api')
+    web = flask.Blueprint('web', __name__, url_prefix='/web')
+    custom = flask.Blueprint('custom', __name__, url_prefix='/custom')
 
-    error = ErrorHandler(app)
-
-    custom = Blueprint('custom', __name__)
-    web = Blueprint('web', __name__)
-
-    error.api_register(app)
     error.web_register(web)
+    error.api_register(api)
+    error.failure_register(app)
+
 
     @error.register(custom)
     def error_handler(exc):
         return str(exc), 500, {'Content-Type': 'text/plain'}
 
 
-    @app.route('/api')
+    @api.route('/')
     def index():
-        abort(500, 'Error from app')
+        flask.abort(500, 'Error from api blueprint')
 
 
-    @web.route('/web')
+    @web.route('/')
     def index():
-        abort(500, 'Error from web blueprint')
+        flask.abort(500, 'Error from web blueprint')
 
 
-    @custom.route('/custom')
+    @custom.route('/')
     def index():
-        abort(500, 'Error from custom blueprint')
+        flask.abort(500, 'Error from custom blueprint')
+
+
+    @app.route('/')
+    def index():
+        raise NameError("test custom")
 
 
     app.register_blueprint(web)
+    app.register_blueprint(api)
+    app.register_blueprint(custom)
     app.run()
 
 
@@ -94,9 +105,10 @@ Example usage
 Configuration
 ^^^^^^^^^^^^^
 
-1. ``ERROR_PAGE``: *(default: None)* path of html template to use for show error message
+1. ``ERROR_PAGE``: *(default: error.html)* path of html template to use for show error message
 2. ``ERROR_DEFAULT_MSG``: *(default: Unhandled Exception)* default message for unhandled exceptions
 3. ``ERROR_XHR_ENABLED``: *(default: True)* enable or disable api response where request is XHR
-
+4. ``ERROR_FORCE_CONTENT_TYPE``: *(True)* force response content type to be api problem compliant
+5. ``ERROR_CONTENT_TYPES``: *('json', 'xml'))* list of format types to force content type
 
 License MIT

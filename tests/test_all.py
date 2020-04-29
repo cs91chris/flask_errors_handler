@@ -1,15 +1,10 @@
 import pytest
+from werkzeug.routing import RequestRedirect
+from flask import Flask, abort, Response, Blueprint
 
-from flask import Flask
-from flask import abort
-from flask import Response
-from flask import Blueprint
-
-from flask_errors_handler import ErrorHandler
-from flask_errors_handler import DefaultDispatcher
-from flask_errors_handler import SubdomainDispatcher
-from flask_errors_handler import URLPrefixDispatcher
-
+from flask_errors_handler import (
+    ErrorHandler, SubdomainDispatcher, URLPrefixDispatcher
+)
 
 error = ErrorHandler()
 
@@ -17,53 +12,58 @@ error = ErrorHandler()
 @pytest.fixture
 def app():
     _app = Flask(__name__)
-    _app.config['SERVER_NAME'] = 'flask.dev:5000'
     _app.config['ERROR_PAGE'] = 'error.html'
+    _app.config['SERVER_NAME'] = 'flask.dev:5000'
 
-    web = Blueprint('web', __name__)
-    test_bp = Blueprint('test_bp', __name__)
-    custom = Blueprint('custom', __name__, subdomain='api')
+    api = Blueprint('api', __name__)
+    web = Blueprint('web', __name__, url_prefix='/web')
+    custom = Blueprint('custom', __name__, subdomain='api', url_prefix='/custom')
 
-    error.init_app(_app)
-    error.api_register(_app)
+    error.init_app(_app, dispatcher='notfound')
+    error.init_app(_app, dispatcher=SubdomainDispatcher)
+    error.api_register(api)
     error.web_register(web)
+    error.failure_register(_app)
 
-    @test_bp.route('/test')
-    def test():
-        exc = error.normalize(NameError('custom error'))
-        abort(exc.code, exc.description)
+    @_app.route('/not-allowed', methods=['GET'])
+    def test_not_allowed():
+        return 'Not allowed'
 
     @error.register(custom)
     def error_handler(exc):
         return str(exc), 404, {'Content-Type': 'text/html', 'custom': 'test'}
 
-    @_app.route('/api')
+    @api.route('/api')
     def index():
         abort(500, 'Error from app')
 
-    @_app.route('/api/response')
+    @api.route('/api/response')
     def response():
         abort(500, response=Response("response"))
 
-    @_app.route('/permanent/')
+    @api.route('/permanent/')
     def permanent():
         return 'redirected'
 
-    @_app.route('/api/error')
+    @api.route('/api/error')
     def api_error():
         raise NameError('exception from app')
 
-    @_app.route('/methodnotallowed/option')
+    @api.route('/methodnotallowed/option')
     def method_not_allowed_option():
         abort(405, valid_methods=['GET', 'POST'])
 
-    @_app.route('/methodnotallowed')
+    @api.route('/methodnotallowed')
     def method_not_allowed_without_option():
         abort(405)
 
     @web.route('/web')
     def index():
         abort(500, 'Error from web blueprint')
+
+    @web.route('/redirect')
+    def redirect():
+        raise RequestRedirect("/web")
 
     @web.route('/web/error')
     def web_error():
@@ -74,9 +74,9 @@ def app():
     def index():
         abort(500, 'Error from custom blueprint')
 
+    _app.register_blueprint(api)
     _app.register_blueprint(custom, url_prefix='/custom')
     _app.register_blueprint(web, url_prefix='/web')
-    _app.register_blueprint(test_bp, url_prefix='/testbp')
 
     _app.testing = True
     return _app
@@ -127,6 +127,13 @@ def test_web(client):
     assert res.headers.get('Content-Type') == 'text/html; charset=utf-8'
 
 
+def test_web_redirect(client):
+    res = client.get('/web/redirect')
+    assert res.status_code == 308
+    assert res.headers.get('Content-Type') == 'text/html; charset=utf-8'
+    assert res.headers.get('Location').endswith('/web')
+
+
 def test_web_xhr(client):
     res = client.get('/web/web', headers={'X-Requested-With': 'XMLHttpRequest'})
     assert res.status_code == 500
@@ -151,43 +158,36 @@ def method_not_allowed(client):
 
 
 def test_custom(client, app):
-    error.register_dispatcher(SubdomainDispatcher)
     res = client.get('/custom/custom', base_url='http://api.' + app.config['SERVER_NAME'])
     assert res.status_code == 404
     assert res.headers.get('Content-Type') == 'text/html'
 
 
-def test_custom_error(client):
-    res = client.get('/testbp/test')
-    assert res.status_code == 500
-    assert res.headers.get('Content-Type') == 'application/problem+json'
-    assert res.get_json()['type'] == 'https://httpstatuses.com/500'
-
-
-def test_dispatch_error_web(client):
-    error.register_dispatcher(URLPrefixDispatcher)
+def test_dispatch_error_web(client, app):
+    error.register_dispatcher(app, URLPrefixDispatcher)
     res = client.get('/web/web/page-not-found')
     assert res.status_code == 404
     assert 'text/html' in res.headers['Content-Type']
 
 
 def test_dispatch_error_api(client, app):
-    error.register_dispatcher(SubdomainDispatcher)
     res = client.get('/api-not-found', base_url='http://api.' + app.config['SERVER_NAME'])
     assert res.status_code == 404
     assert 'text/html' in res.headers['Content-Type']
     assert 'test' in res.headers['custom']
 
 
-def test_dispatch_default(client):
-    error.register_dispatcher(DefaultDispatcher)
-    res = client.get('/testbp/not-found')
+def test_dispatch_default(client, app):
+    error.register_dispatcher(app, dispatcher='default')
+    res = client.get('/not-found')
     assert res.status_code == 404
-    assert 'text/plain' in res.headers['Content-Type']
+    assert 'text/html' in res.headers['Content-Type']
+    assert 'https://httpstatuses.com/404' in res.data.decode()
 
-    res = client.post('/testbp/test')
+    res = client.post('/not-allowed')
     assert res.status_code == 405
-    assert 'text/plain' in res.headers['Content-Type']
+    assert 'text/html' in res.headers['Content-Type']
+    assert 'https://httpstatuses.com/405' in res.data.decode()
 
 
 def test_permanent_redirect(client):

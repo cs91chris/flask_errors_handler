@@ -1,40 +1,14 @@
-import traceback
 from functools import wraps
 
 import flask
 from flask import current_app as cap
 from jinja2 import TemplateError
-from werkzeug.exceptions import HTTPException, default_exceptions
+from werkzeug.exceptions import default_exceptions
 
+from . import utils
 from .exception import ApiProblem
 from .normalize import DefaultNormalizeMixin
 from .dispatchers import ErrorDispatcher, DEFAULT_DISPATCHERS
-
-
-def default_response_builder(f):
-    """
-
-    :param f: function that returns dict response, status code and headers dict
-    :return: flask response of decorated function
-    """
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        """
-
-        :param args:
-        :param kwargs:
-        :return:
-        """
-        r, s, h = f(*args, **kwargs)
-        resp = flask.json.dumps(r)
-        m = h.get('Content-Type', '')
-
-        if cap.config['ERROR_FORCE_CONTENT_TYPE'] is True:
-            if ApiProblem.ct_id not in m or 'json' not in m:
-                m = 'application/{}+json'.format(ApiProblem.ct_id)
-
-        return flask.Response(resp, status=s, headers=h, mimetype=m)
-    return wrapper
 
 
 class ErrorHandler(DefaultNormalizeMixin):
@@ -58,16 +32,12 @@ class ErrorHandler(DefaultNormalizeMixin):
         :param dispatcher: ErrorDispatcher instance or default configured string name
         """
         self._exc_class = exc_class or ApiProblem
-        self._response = response or default_response_builder
+        self._response = response or utils.default_response_builder
 
         if not issubclass(self._exc_class, ApiProblem):
             raise TypeError("exc_class argument must extend ApiProblem class")
 
-        app.config.setdefault('ERROR_PAGE', 'error.html')
-        app.config.setdefault('ERROR_XHR_ENABLED', True)
-        app.config.setdefault('ERROR_DEFAULT_MSG', 'Unhandled Exception')
-        app.config.setdefault('ERROR_FORCE_CONTENT_TYPE', True)
-        app.config.setdefault('ERROR_CONTENT_TYPES', ('json', 'xml'))
+        utils.set_default_config(app)
 
         if not hasattr(app, 'extensions'):
             app.extensions = dict()
@@ -124,37 +94,14 @@ class ErrorHandler(DefaultNormalizeMixin):
             return wrapper()
         return _register
 
-    def normalize(self, ex, exc_class=None, **kwargs):
+    def _failure_handler(self, ex):
         """
 
-        :param ex: Exception
-        :param exc_class: overrides ApiProblem class
-        :return: new Exception instance of HTTPException
+        :param ex:
+        :return:
         """
-        # noinspection PyPep8Naming
-        ExceptionClass = exc_class or self._exc_class
-        ex = super().normalize(ex, exc_class)
-
-        if isinstance(ex, ExceptionClass):
-            return ex
-
-        tb = traceback.format_exc()
-        if cap.config['DEBUG']:
-            mess = tb
-        else:
-            mess = cap.config['ERROR_DEFAULT_MSG']
-
-        _ex = ExceptionClass(mess, **kwargs)
-
-        if isinstance(ex, HTTPException):
-            _ex.code = ex.code
-            _ex.description = ex.description
-            _ex.response = ex.response if hasattr(ex, 'response') else None
-            _ex.headers.update(**(ex.headers if hasattr(ex, 'headers') else {}))
-        else:
-            cap.logger.error(tb)
-
-        return _ex
+        ex = self.normalize(ex, self._exc_class)
+        return flask.render_template_string(ex.default_html_template, exc=ex), ex.code
 
     def _api_handler(self, ex):
         """
@@ -162,39 +109,17 @@ class ErrorHandler(DefaultNormalizeMixin):
         :param ex: Exception
         :return:
         """
-        ex = self.normalize(ex)
+        ex = self.normalize(ex, self._exc_class)
 
         if isinstance(ex.response, flask.Response):
             return ex.response, ex.code
 
-        @self._response
-        def _response():
-            """
-
-            :return:
-            """
-            return ex.prepare_response()
-
-        resp = _response()
+        resp = self._response(lambda: ex.prepare_response())()
 
         if cap.config['ERROR_FORCE_CONTENT_TYPE'] is True:
-            ct = resp.headers.get('Content-Type') or 'application/{}'.format(ApiProblem.ct_id)
-            if ApiProblem.ct_id not in ct:
-                if any([i in ct for i in cap.config['ERROR_CONTENT_TYPES']]):
-                    ct = "/{}+".format(ApiProblem.ct_id).join(ct.split('/', maxsplit=1))
-
-            resp.headers.update({'Content-Type': ct})
+            resp.headers = utils.force_content_type(resp.headers)
 
         return resp
-
-    def _failure_handler(self, ex):
-        """
-
-        :param ex:
-        :return:
-        """
-        ex = self.normalize(ex)
-        return flask.render_template_string(ex.default_html_template, exc=ex), ex.code
 
     def _web_handler(self, ex):
         """
@@ -202,7 +127,7 @@ class ErrorHandler(DefaultNormalizeMixin):
         :param ex: Exception
         :return:
         """
-        ex = self.normalize(ex)
+        ex = self.normalize(ex, self._exc_class)
 
         if cap.config['ERROR_XHR_ENABLED'] is True:
             # check if request is XHR (for compatibility with old clients)
@@ -265,4 +190,4 @@ class ErrorHandler(DefaultNormalizeMixin):
                 :return:
                 """
                 d = dispatcher(app)
-                return d.dispatch(self.normalize(exc))
+                return d.dispatch(self.normalize(exc, self._exc_class))

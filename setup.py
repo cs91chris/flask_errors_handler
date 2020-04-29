@@ -5,8 +5,8 @@ Flask-ErrorsHandler
 import sys
 
 import pytest
-from setuptools import setup, find_packages
 from setuptools.command.test import test
+from setuptools import setup, find_packages
 
 from flask_errors_handler import __author_info__, __version__
 
@@ -45,8 +45,8 @@ setup(
         'Flask==1.1.*'
     ],
     tests_require=[
-        'pytest==5.4.*',
-        'pytest-cov==2.8.*'
+        'pytest==5.*',
+        'pytest-cov==2.*'
     ],
     cmdclass={'test': PyTest},
     test_suite='tests',

@@ -98,12 +98,27 @@ class ErrorHandler(DefaultNormalizeMixin):
             """
             @wraps(hderr)
             def wrapper():
-                """
-
-                """
                 for code in default_exceptions.keys():
                     bp.errorhandler(code)(hderr)
 
+                ErrorHandler.failure(bp)(hderr)
+
+            return wrapper()
+        return _register
+
+    @staticmethod
+    def failure(bp):
+        """
+
+        :param bp: blueprint or flask app
+        """
+        def _register(hderr):
+            """
+
+            :param hderr: function that takes only an Exception object as argument
+            """
+            @wraps(hderr)
+            def wrapper():
                 bp.register_error_handler(Exception, hderr)
 
             return wrapper()
@@ -172,6 +187,15 @@ class ErrorHandler(DefaultNormalizeMixin):
 
         return resp
 
+    def _failure_handler(self, ex):
+        """
+
+        :param ex:
+        :return:
+        """
+        ex = self.normalize(ex)
+        return flask.render_template_string(ex.default_html_template, exc=ex), ex.code
+
     def _web_handler(self, ex):
         """
 
@@ -196,21 +220,32 @@ class ErrorHandler(DefaultNormalizeMixin):
 
         :param bp:
         """
-        ErrorHandler.register(bp)(ErrorDispatcher.default)
+        ErrorHandler.register(bp)(self._failure_handler)
 
-    def api_register(self, bp):
+    # noinspection PyMethodMayBeStatic
+    def failure_register(self, bp, callback=None):
+        """
+
+        :param bp: blueprint or flask app
+        :param callback: optional function to register
+        """
+        ErrorHandler.failure(bp)(callback or self._failure_handler)
+
+    def api_register(self, bp, callback=None):
         """
 
         :param bp: app or blueprint
+        :param callback: optional function to register
         """
-        ErrorHandler.register(bp)(self._api_handler)
+        ErrorHandler.register(bp)(callback or self._api_handler)
 
-    def web_register(self, bp):
+    def web_register(self, bp, callback=None):
         """
 
         :param bp: app or blueprint
+        :param callback: optional function to register
         """
-        ErrorHandler.register(bp)(self._web_handler)
+        ErrorHandler.register(bp)(callback or self._web_handler)
 
     def register_dispatcher(self, app, dispatcher, codes=None):
         """

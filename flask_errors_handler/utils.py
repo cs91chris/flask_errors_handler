@@ -35,8 +35,8 @@ def default_response_builder(f):
 def force_content_type(hdr):
     """
 
-    :param hdr:
-    :return:
+    :param hdr: headers dict
+    :return: updated headers
     """
     ct = hdr.get('Content-Type') or 'x-application/{}'.format(ApiProblem.ct_id)
     if ApiProblem.ct_id not in ct:

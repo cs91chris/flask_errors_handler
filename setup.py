@@ -2,16 +2,49 @@
 Flask-ErrorsHandler
 -------------
 """
+import os
+import re
 import sys
 
-import pytest
 from setuptools.command.test import test
 from setuptools import setup, find_packages
 
-from flask_errors_handler import __author_info__, __version__
+BASE_PATH = os.path.dirname(__file__)
+VERSION_FILE = os.path.join('flask_errors_handler', 'version.py')
 
-with open("README.rst") as fh:
-    long_description = fh.read()
+
+def read(file):
+    """
+
+    :param file:
+    :return:
+    """
+    with open(os.path.join(BASE_PATH, file)) as f:
+        return f.read()
+
+
+def grep(file, name):
+    """
+
+    :param file:
+    :param name:
+    :return:
+    """
+    pattern = r"{attr}\W*=\W*'([^']+)'".format(attr=name)
+    strval, = re.findall(pattern, read(file))
+    return strval
+
+
+def readme(file):
+    """
+
+    :param file:
+    :return:
+    """
+    try:
+        return read(file)
+    except OSError as exc:
+        print(str(exc), file=sys.stderr)
 
 
 class PyTest(test):
@@ -25,28 +58,29 @@ class PyTest(test):
         """
 
         """
+        import pytest
         sys.exit(pytest.main(['tests']))
 
 
 setup(
     name='Flask-ErrorsHandler',
-    version=__version__,
+    version=grep(VERSION_FILE, '__version__'),
     url='https://github.com/cs91chris/flask_errors_handler',
     license='MIT',
-    author=__author_info__['name'],
-    author_email=__author_info__['email'],
+    author=grep(VERSION_FILE, '__author_name__'),
+    author_email=grep(VERSION_FILE, '__author_email__'),
     description='Customizable errors handler for flask application and blueprints',
-    long_description=long_description,
+    long_description=readme('README.rst'),
     packages=find_packages(),
     zip_safe=False,
     include_package_data=True,
     platforms='any',
     install_requires=[
-        'Flask==1.1.*'
+        'Flask >= 1.0.4',
     ],
     tests_require=[
-        'pytest==5.*',
-        'pytest-cov==2.*'
+        'pytest >= 5',
+        'pytest-cov >= 2'
     ],
     cmdclass={'test': PyTest},
     test_suite='tests',

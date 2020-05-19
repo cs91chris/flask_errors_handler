@@ -43,7 +43,8 @@ class ErrorHandler(DefaultNormalizeMixin):
             app.extensions = dict()
         app.extensions['errors_handler'] = self
 
-        self.register_dispatcher(app, dispatcher)
+        if dispatcher is not None:
+            self.register_dispatcher(app, dispatcher)
 
     @staticmethod
     def register(bp, code=None):

@@ -30,7 +30,7 @@ Notices:
 
 1. In order to use correctly dispatcher you must set prefix or subdomain in Blueprints constructor, see example below.
 2. If you use dispatcher do not register an handler to app object because it overwrites dispatcher.
-3. When using a dispatcher you should use failure handler on app to catch hunandled exceptions
+3. When using a dispatcher you should use failure handler on app to catch unhandled exceptions.
 
 
 QuickStart
@@ -109,6 +109,6 @@ Configuration
 2. ``ERROR_DEFAULT_MSG``: *(default: Unhandled Exception)* default message for unhandled exceptions
 3. ``ERROR_XHR_ENABLED``: *(default: True)* enable or disable api response where request is XHR
 4. ``ERROR_FORCE_CONTENT_TYPE``: *(True)* force response content type to be api problem compliant
-5. ``ERROR_CONTENT_TYPES``: *('json', 'xml'))* list of format types to force content type
+5. ``ERROR_CONTENT_TYPES``: *('json', 'xml'))* list of format types to force api problem content type
 
 License MIT

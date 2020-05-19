@@ -1,16 +1,10 @@
 from warnings import warn
 
 import flask
+from flask import current_app as cap
 
 
 class ErrorDispatcher(object):
-    def __init__(self, app):
-        """
-
-        :param app: flask app
-        """
-        self._app = app
-
     @staticmethod
     def default(exc):
         """
@@ -46,12 +40,12 @@ class SubdomainDispatcher(ErrorDispatcher):
         :param exc:
         :return:
         """
-        len_domain = len(self._app.config.get('SERVER_NAME') or '')
+        len_domain = len(cap.config.get('SERVER_NAME') or '')
         if len_domain > 0:
             subdomain = flask.request.host[:-len_domain].rstrip('.') or None
-            for bp_name, bp in self._app.blueprints.items():
+            for bp_name, bp in cap.blueprints.items():
                 if subdomain == bp.subdomain:
-                    handler = self._app.error_handler_spec.get(bp_name, {}).get(exc.code)
+                    handler = cap.error_handler_spec.get(bp_name, {}).get(exc.code)
                     for k, v in (handler or {}).items():
                         return v(exc)
         else:
@@ -67,13 +61,13 @@ class URLPrefixDispatcher(ErrorDispatcher):
         :param exc:
         :return:
         """
-        for bp_name, bp in self._app.blueprints.items():
+        for bp_name, bp in cap.blueprints.items():
             if not bp.url_prefix:
                 warn("You must set 'url_prefix' when instantiate Blueprint: '{}'".format(bp_name))
                 continue
 
             if flask.request.path.startswith(bp.url_prefix):
-                handler = self._app.error_handler_spec.get(bp_name, {}).get(exc.code)
+                handler = cap.error_handler_spec.get(bp_name, {}).get(exc.code)
                 for k, v in (handler or {}).items():
                     return v(exc)
 

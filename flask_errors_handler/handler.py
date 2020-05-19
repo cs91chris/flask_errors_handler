@@ -194,5 +194,5 @@ class ErrorHandler(DefaultNormalizeMixin):
                 :param exc: Exception instance
                 :return: dispatcher response
                 """
-                d = dispatcher_class(app)
+                d = dispatcher_class()
                 return d.dispatch(self.normalize(exc, self._exc_class))

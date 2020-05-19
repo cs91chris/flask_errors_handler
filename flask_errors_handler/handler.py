@@ -6,9 +6,9 @@ from jinja2 import TemplateError
 from werkzeug.exceptions import default_exceptions
 
 from . import utils
+from .dispatchers import DEFAULT_DISPATCHERS, ErrorDispatcher
 from .exception import ApiProblem
 from .normalize import DefaultNormalizeMixin
-from .dispatchers import ErrorDispatcher, DEFAULT_DISPATCHERS
 
 
 class ErrorHandler(DefaultNormalizeMixin):

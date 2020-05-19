@@ -1,8 +1,8 @@
 import traceback
 
 from flask import current_app as cap
+from werkzeug.exceptions import HTTPException, MethodNotAllowed
 from werkzeug.routing import RequestRedirect
-from werkzeug.exceptions import MethodNotAllowed, HTTPException
 
 
 class BaseNormalize(object):

@@ -110,5 +110,6 @@ Configuration
 3. ``ERROR_XHR_ENABLED``: *(default: True)* enable or disable api response where request is XHR
 4. ``ERROR_FORCE_CONTENT_TYPE``: *(True)* force response content type to be api problem compliant
 5. ``ERROR_CONTENT_TYPES``: *('json', 'xml'))* list of format types to force api problem content type
+6. ``ERROR_DISPATCHER``: dispatcher to use, one of: ``default, urlprefix, subdomain``
 
 License MIT

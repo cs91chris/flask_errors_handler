@@ -57,3 +57,4 @@ def set_default_config(app):
     app.config.setdefault('ERROR_DEFAULT_MSG', 'Unhandled Exception')
     app.config.setdefault('ERROR_FORCE_CONTENT_TYPE', True)
     app.config.setdefault('ERROR_CONTENT_TYPES', ('json', 'xml'))
+    app.config.setdefault('ERROR_DISPATCHER', None)

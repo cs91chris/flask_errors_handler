@@ -43,6 +43,7 @@ class ErrorHandler(DefaultNormalizeMixin):
             app.extensions = dict()
         app.extensions['errors_handler'] = self
 
+        dispatcher = dispatcher or app.config['ERROR_DISPATCHER']
         if dispatcher is not None:
             self.register_dispatcher(app, dispatcher)
 

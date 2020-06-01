@@ -1,6 +1,8 @@
 Flask-ErrorsHandler
 ===================
 
+|download| |version|
+
 Set customizable default errors handler for flask app and blueprints.
 
 You can register error handler for:
@@ -113,3 +115,6 @@ Configuration
 6. ``ERROR_DISPATCHER``: dispatcher to use, one of: ``default, urlprefix, subdomain``
 
 License MIT
+
+.. |download| image:: https://pypip.in/download/flask_errorshandler/badge.png
+.. |version| image:: https://pypip.in/version/flask_errorshandler/badge.png

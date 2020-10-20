@@ -8,7 +8,7 @@ You can register error handler for:
 - api that returns JSON, default response is as API problem specification like (see https://tools.ietf.org/html/rfc7807).
   Instead you can use your own response implementation passed as argument to ``ErrorHandler`` class:
   it must be a decorator and must take 3 args, a dict response, status code and dict headers.
-- web that returns html page or api response if request is XHR
+- web that returns html page or api response if request is XHR (for compatibility with old clients)
 - you can register custom handlers for blueprint or the entire app
 
 This module provide also an abstract ``ErrorDispatcher`` class in order to dispatch 404 or 405 error to the correct blueprint

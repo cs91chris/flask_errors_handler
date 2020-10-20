@@ -1,10 +1,5 @@
-from .version import *
+from .dispatchers import (DefaultDispatcher, ErrorDispatcher, SubdomainDispatcher, URLPrefixDispatcher)
 from .exception import ApiProblem
 from .handler import ErrorHandler
 from .normalize import BaseNormalize, DefaultNormalizeMixin
-from .dispatchers import (
-    ErrorDispatcher,
-    DefaultDispatcher,
-    URLPrefixDispatcher,
-    SubdomainDispatcher
-)
+from .version import *

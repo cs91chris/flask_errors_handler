@@ -4,26 +4,25 @@ from flask import current_app as cap
 from werkzeug.exceptions import HTTPException, MethodNotAllowed
 from werkzeug.routing import RequestRedirect
 
+from .exception import ApiProblem
+
 
 class BaseNormalize(object):
-    def normalize(self, ex, exc_class=None, **kwargs):
+    def normalize(self, ex, **kwargs):
         """
         Child class must return super().normalize() so as to keep the chain of Mixins
 
         :param ex: input exception
-        :param exc_class: class of output exception
         :return:
         """
         return ex
 
 
 class RequestRedirectMixin(BaseNormalize):
-    def normalize(self, ex, exc_class=None, **kwargs):
+    def normalize(self, ex, **kwargs):
         """
 
         :param ex:
-        :param exc_class:
-        :param kwargs:
         :return:
         """
         if isinstance(ex, RequestRedirect):
@@ -31,16 +30,14 @@ class RequestRedirectMixin(BaseNormalize):
             ex.headers = location
             ex.response = location
 
-        return super().normalize(ex, exc_class)
+        return super().normalize(ex)
 
 
 class MethodNotAllowedMixin(BaseNormalize):
-    def normalize(self, ex, exc_class=None, **kwargs):
+    def normalize(self, ex, **kwargs):
         """
 
         :param ex:
-        :param exc_class:
-        :param kwargs:
         :return:
         """
         if isinstance(ex, MethodNotAllowed):
@@ -50,25 +47,20 @@ class MethodNotAllowedMixin(BaseNormalize):
             except TypeError:
                 pass
 
-        return super().normalize(ex, exc_class)
+        return super().normalize(ex)
 
 
-class DefaultNormalizeMixin(
-    MethodNotAllowedMixin,
-    RequestRedirectMixin
-):
-    def normalize(self, ex, exc_class=None, **kwargs):
+class DefaultNormalizeMixin(MethodNotAllowedMixin, RequestRedirectMixin):
+    def normalize(self, ex, exc_class=ApiProblem, **kwargs):
         """
 
         :param ex: Exception
         :param exc_class: overrides ApiProblem class
         :return: new Exception instance of HTTPException
         """
-        # noinspection PyPep8Naming
-        ExceptionClass = exc_class
-        ex = super().normalize(ex, exc_class)
+        ex = super().normalize(ex)
 
-        if isinstance(ex, ExceptionClass):
+        if isinstance(ex, exc_class):
             return ex
 
         tb = traceback.format_exc()
@@ -77,7 +69,7 @@ class DefaultNormalizeMixin(
         else:
             mess = cap.config['ERROR_DEFAULT_MSG']
 
-        _ex = ExceptionClass(mess, **kwargs)
+        _ex = exc_class(mess, **kwargs)
 
         if isinstance(ex, HTTPException):
             _ex.code = ex.code

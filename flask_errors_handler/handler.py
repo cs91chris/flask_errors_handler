@@ -5,7 +5,6 @@ from flask import current_app as cap
 from jinja2 import TemplateError
 from werkzeug.exceptions import default_exceptions
 
-from . import utils
 from .dispatchers import DEFAULT_DISPATCHERS, ErrorDispatcher
 from .exception import ApiProblem
 from .normalize import DefaultNormalizeMixin
@@ -32,12 +31,11 @@ class ErrorHandler(DefaultNormalizeMixin):
         :param dispatcher: ErrorDispatcher instance or default configured string name
         """
         self._exc_class = exc_class or ApiProblem
-        self._response = response or utils.default_response_builder
+        self._response = response or self._default_response_builder
 
-        if not issubclass(self._exc_class, ApiProblem):
-            raise TypeError("exc_class argument must extend ApiProblem class")
+        assert issubclass(self._exc_class, ApiProblem)
 
-        utils.set_default_config(app)
+        self.set_default_config(app)
 
         if not hasattr(app, 'extensions'):
             app.extensions = dict()
@@ -48,17 +46,69 @@ class ErrorHandler(DefaultNormalizeMixin):
             self.register_dispatcher(app, dispatcher)
 
     @staticmethod
+    def set_default_config(app):
+        """
+
+        :param app: Flask instance
+        """
+        app.config.setdefault('ERROR_PAGE', 'error.html')
+        app.config.setdefault('ERROR_XHR_ENABLED', True)
+        app.config.setdefault('ERROR_DEFAULT_MSG', 'Unhandled Exception')
+        app.config.setdefault('ERROR_FORCE_CONTENT_TYPE', True)
+        app.config.setdefault('ERROR_CONTENT_TYPES', ('json', 'xml'))
+        app.config.setdefault('ERROR_DISPATCHER', None)
+
+    def _default_response_builder(self, f):
+        """
+
+        :param f: function that returns dict response, status code and headers dict
+        :return: flask response of decorated function
+        """
+
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            r, s, h = f(*args, **kwargs)
+
+            if not h.get('Content-Type'):
+                h['Content-Type'] = 'application/{}+json'.format(self._exc_class.ct_id)
+            elif cap.config['ERROR_FORCE_CONTENT_TYPE'] is True:
+                h = self._force_content_type(h)
+
+            options = dict(status=s, headers=h, mimetype=h['Content-Type'])
+            return flask.Response(flask.json.dumps(r), **options)
+
+        return wrapper
+
+    def _force_content_type(self, hdr):
+        """
+
+        :param hdr: headers dict
+        :return: updated headers
+        """
+        ct_id = self._exc_class.ct_id
+        ct = hdr.get('Content-Type') or 'x-application/{}'.format(ct_id)
+
+        if ct_id not in ct:
+            if any([i in ct for i in cap.config['ERROR_CONTENT_TYPES']]):
+                ct = "/{}+".format(ct_id).join(ct.split('/', maxsplit=1))
+
+        hdr.update({'Content-Type': ct})
+        return hdr
+
+    @staticmethod
     def register(bp, code=None):
         """
 
         :param code: optional a specific http code otherwise all
         :param bp: blueprint or flask app
         """
+
         def _register(hderr):
             """
 
             :param hderr: function that takes only an Exception object as argument
             """
+
             @wraps(hderr)
             def wrapper():
                 if code is not None:
@@ -70,6 +120,7 @@ class ErrorHandler(DefaultNormalizeMixin):
                     ErrorHandler.failure(bp)(hderr)
 
             return wrapper()
+
         return _register
 
     @staticmethod
@@ -78,16 +129,19 @@ class ErrorHandler(DefaultNormalizeMixin):
 
         :param bp: blueprint or flask app
         """
+
         def _register(hderr):
             """
 
             :param hderr: function that takes only an Exception object as argument
             """
+
             @wraps(hderr)
             def wrapper():
                 bp.register_error_handler(Exception, hderr)
 
             return wrapper()
+
         return _register
 
     def _failure_handler(self, ex):
@@ -113,7 +167,7 @@ class ErrorHandler(DefaultNormalizeMixin):
         resp = self._response(lambda: ex.prepare_response())()
 
         if cap.config['ERROR_FORCE_CONTENT_TYPE'] is True:
-            resp.headers = utils.force_content_type(resp.headers)
+            resp.headers = self._force_content_type(resp.headers)
 
         return resp
 
@@ -176,9 +230,15 @@ class ErrorHandler(DefaultNormalizeMixin):
         :param codes: list of http codes
         """
         try:
-            issubclass(dispatcher, ErrorDispatcher)
-            dispatcher_class = dispatcher
-        except TypeError:
+            if issubclass(dispatcher, ErrorDispatcher):
+                dispatcher_class = dispatcher
+            else:
+                app.logger.error(
+                    "dispatcher '{}' must be subclass of '{}'".format(
+                        dispatcher, ErrorDispatcher.__name__
+                    ))
+                return
+        except TypeError:  # dispatcher is not a class
             dispatcher_class = DEFAULT_DISPATCHERS.get(dispatcher)
             if not dispatcher_class:
                 app.logger.error(

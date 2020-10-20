@@ -4,7 +4,7 @@ import flask
 from flask import current_app as cap
 
 
-class ErrorDispatcher(object):
+class ErrorDispatcher:
     @staticmethod
     def default(exc):
         """
@@ -75,7 +75,7 @@ class URLPrefixDispatcher(ErrorDispatcher):
 
 
 DEFAULT_DISPATCHERS = {
-    'default': DefaultDispatcher,
+    'default':   DefaultDispatcher,
     'subdomain': SubdomainDispatcher,
     'urlprefix': URLPrefixDispatcher,
 }

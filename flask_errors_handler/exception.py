@@ -68,7 +68,7 @@ class ApiProblem(InternalServerError):
                 <p>Problem type: <a href="{{ exc.get_type() }}">{{ exc.get_type() }}</a></p>
                 <p>Problem specific: <a href="{{ exc.get_instance() }}">{{ exc.get_instance() }}</a></p>
                 <h3>Description</h3>
-                <p>{{ exc.get_detail() }}</p>
+                <p><pre>{{ exc.get_detail() }}</pre></p>
             </body>
         </html>
         '''

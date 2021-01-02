@@ -21,7 +21,7 @@ class ErrorDispatcher:
 
         :param exc:
         """
-        raise NotImplemented
+        raise NotImplemented  # pragma: no cover
 
 
 class DefaultDispatcher(ErrorDispatcher):
@@ -48,10 +48,10 @@ class SubdomainDispatcher(ErrorDispatcher):
                     handler = cap.error_handler_spec.get(bp_name, {}).get(exc.code)
                     for k, v in (handler or {}).items():
                         return v(exc)
-        else:
+        else:  # pragma: no cover
             warn("You must set 'SERVER_NAME' in order to use {}".format(self.__class__.__name__))
 
-        return self.default(exc)
+        return self.default(exc)  # pragma: no cover
 
 
 class URLPrefixDispatcher(ErrorDispatcher):
@@ -71,7 +71,7 @@ class URLPrefixDispatcher(ErrorDispatcher):
                 for k, v in (handler or {}).items():
                     return v(exc)
 
-        return self.default(exc)
+        return self.default(exc)  # pragma: no cover
 
 
 DEFAULT_DISPATCHERS = {

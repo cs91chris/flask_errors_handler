@@ -44,7 +44,7 @@ class MethodNotAllowedMixin(BaseNormalize):
             try:
                 ex.headers = dict(Allow=", ".join(ex.valid_methods))
                 ex.response = dict(Allow=ex.valid_methods)
-            except TypeError:
+            except TypeError:  # pragma: no cover
                 pass
 
         return super().normalize(ex)
@@ -65,7 +65,7 @@ class DefaultNormalizeMixin(MethodNotAllowedMixin, RequestRedirectMixin):
 
         tb = traceback.format_exc()
         if cap.config['DEBUG']:
-            mess = tb
+            mess = tb  # pragma: no cover
         else:
             mess = cap.config['ERROR_DEFAULT_MSG']
 

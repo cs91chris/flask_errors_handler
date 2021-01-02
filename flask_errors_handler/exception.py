@@ -90,7 +90,7 @@ class ApiProblem(InternalServerError):
 
         try:
             self.headers.update(**h)
-        except AttributeError:
+        except AttributeError:  # pragma: no cover
             self.headers = h
 
     def prepare_response(self):

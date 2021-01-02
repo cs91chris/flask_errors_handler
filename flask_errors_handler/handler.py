@@ -20,15 +20,16 @@ class ErrorHandler(DefaultNormalizeMixin):
         self._exc_class = None
 
         if app is not None:
-            self.init_app(app, **kwargs)
+            self.init_app(app, **kwargs)  # pragma: no cover
 
-    def init_app(self, app, response=None, exc_class=None, dispatcher=None):
+    def init_app(self, app, response=None, exc_class=None, dispatcher=None, handler=None):
         """
 
         :param app: Flask instance
         :param response: decorator that produces a Flask Response object
         :param exc_class: subclass of ApiProblem
         :param dispatcher: ErrorDispatcher instance or default configured string name
+        :param handler: app error handler one of (api, web)
         """
         self._exc_class = exc_class or ApiProblem
         self._response = response or self._default_response_builder
@@ -38,12 +39,20 @@ class ErrorHandler(DefaultNormalizeMixin):
         self.set_default_config(app)
 
         if not hasattr(app, 'extensions'):
-            app.extensions = dict()
+            app.extensions = dict()  # pragma: no cover
         app.extensions['errors_handler'] = self
 
         dispatcher = dispatcher or app.config['ERROR_DISPATCHER']
         if dispatcher is not None:
             self.register_dispatcher(app, dispatcher)
+
+        handler = handler or app.config['ERROR_HANDLER']
+        if handler == 'api':
+            self.api_register(app)  # pragma: no cover
+        elif handler == 'web':
+            self.web_register(app)  # pragma: no cover
+        else:
+            app.logger.warning("invalid handler: '{}'".format(handler))
 
     @staticmethod
     def set_default_config(app):
@@ -57,6 +66,7 @@ class ErrorHandler(DefaultNormalizeMixin):
         app.config.setdefault('ERROR_FORCE_CONTENT_TYPE', True)
         app.config.setdefault('ERROR_CONTENT_TYPES', ('json', 'xml'))
         app.config.setdefault('ERROR_DISPATCHER', None)
+        app.config.setdefault('ERROR_HANDLER', None)
 
     def _default_response_builder(self, f):
         """
@@ -96,11 +106,11 @@ class ErrorHandler(DefaultNormalizeMixin):
         return hdr
 
     @staticmethod
-    def register(bp, code=None):
+    def register(*bps, code=None):
         """
 
+        :param bps: blueprint's list or flask app
         :param code: optional a specific http code otherwise all
-        :param bp: blueprint or flask app
         """
 
         def _register(hderr):
@@ -111,13 +121,14 @@ class ErrorHandler(DefaultNormalizeMixin):
 
             @wraps(hderr)
             def wrapper():
-                if code is not None:
-                    bp.errorhandler(code)(hderr)
-                else:
-                    for c in default_exceptions.keys():
-                        bp.errorhandler(c)(hderr)
+                for b in bps:
+                    if code is not None:
+                        b.errorhandler(code)(hderr)
+                    else:
+                        for c in default_exceptions.keys():
+                            b.errorhandler(c)(hderr)
 
-                    ErrorHandler.failure(bp)(hderr)
+                        ErrorHandler.failure(b)(hderr)
 
             return wrapper()
 
@@ -189,38 +200,42 @@ class ErrorHandler(DefaultNormalizeMixin):
         except TemplateError:
             return flask.render_template_string(ex.default_html_template, exc=ex), ex.code
 
-    def default_register(self, bp):
+    def default_register(self, *bps):
         """
 
-        :param bp:
+        :param bps:
         """
-        ErrorHandler.register(bp)(self._failure_handler)
+        for b in bps:
+            ErrorHandler.register(b)(self._failure_handler)
 
-    def failure_register(self, bp, callback=None):
+    def failure_register(self, *bps, callback=None):
         """
 
-        :param bp: blueprint or flask app
+        :param bps: blueprint or flask app
         :param callback: optional function to register
         """
-        ErrorHandler.failure(bp)(callback or self._failure_handler)
+        for b in bps:
+            ErrorHandler.failure(b)(callback or self._failure_handler)
 
-    def api_register(self, bp, callback=None, **kwargs):
+    def api_register(self, *bps, callback=None, **kwargs):
         """
 
-        :param bp: app or blueprint
-        :param callback: optional function to register
-        :param kwargs: passed to register
-        """
-        ErrorHandler.register(bp, **kwargs)(callback or self._api_handler)
-
-    def web_register(self, bp, callback=None, **kwargs):
-        """
-
-        :param bp: app or blueprint
+        :param bps: app or blueprint
         :param callback: optional function to register
         :param kwargs: passed to register
         """
-        ErrorHandler.register(bp, **kwargs)(callback or self._web_handler)
+        for b in bps:
+            ErrorHandler.register(b, **kwargs)(callback or self._api_handler)
+
+    def web_register(self, *bps, callback=None, **kwargs):
+        """
+
+        :param bps: app or blueprint
+        :param callback: optional function to register
+        :param kwargs: passed to register
+        """
+        for b in bps:
+            ErrorHandler.register(b, **kwargs)(callback or self._web_handler)
 
     def register_dispatcher(self, app, dispatcher, codes=(404, 405)):
         """
@@ -232,7 +247,7 @@ class ErrorHandler(DefaultNormalizeMixin):
         try:
             if issubclass(dispatcher, ErrorDispatcher):
                 dispatcher_class = dispatcher
-            else:
+            else:  # pragma: no cover
                 app.logger.error(
                     "dispatcher '{}' must be subclass of '{}'".format(
                         dispatcher, ErrorDispatcher.__name__
@@ -240,7 +255,7 @@ class ErrorHandler(DefaultNormalizeMixin):
                 return
         except TypeError:  # dispatcher is not a class
             dispatcher_class = DEFAULT_DISPATCHERS.get(dispatcher)
-            if not dispatcher_class:
+            if not dispatcher_class:  # pragma: no cover
                 app.logger.error(
                     "dispatcher '{}' not exists. Use one of {}".format(
                         dispatcher, DEFAULT_DISPATCHERS.keys()

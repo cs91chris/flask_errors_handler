@@ -1,7 +1,8 @@
 import pytest
 from werkzeug.routing import RequestRedirect
 from flask import Flask, abort, Response, Blueprint
-
+from werkzeug.datastructures import WWWAuthenticate
+from datetime import datetime
 from flask_errors_handler import (
     ErrorHandler, SubdomainDispatcher, URLPrefixDispatcher
 )
@@ -37,9 +38,23 @@ def app():
     def index():
         abort(500, 'Error from app')
 
+    @api.route('/api/unauthorized')
+    def unauthorized():
+        auth = WWWAuthenticate()
+        auth.set_basic()
+        abort(401, www_authenticate=auth)
+
+    @api.route('/api/retry')
+    def retry():
+        abort(429, retry_after=datetime(year=2000, month=3, day=1))
+
     @api.route('/api/response')
     def response():
         abort(500, response=Response("response"))
+
+    @api.route('/api/range')
+    def ranger():
+        abort(416, length=10)
 
     @api.route('/permanent/')
     def permanent():
@@ -98,6 +113,7 @@ def test_method_not_allowed(client):
     res = client.post('/api')
     assert res.status_code == 405
     assert 'Allow' in res.headers
+    assert 'allowed' in res.get_json()['response']
     assert res.get_json()['type'] == 'https://httpstatuses.com/405'
 
 
@@ -200,3 +216,29 @@ def test_response(client):
     res = client.get('/api/response')
     assert res.status_code == 500
     assert res.data == b'response'
+
+
+def test_unauthorized(client):
+    res = client.get('/api/unauthorized')
+    assert res.status_code == 401
+    assert res.headers['WWW-Authenticate'] == 'Basic realm="authentication required"'
+    auth = res.get_json()['response']['authenticate'][0]
+    assert auth['auth_type'] == 'basic'
+    assert auth['realm'] == 'authentication required'
+
+
+def test_retry_after(client):
+    date = 'Wed, 01 Mar 2000 00:00:00 GMT'
+    res = client.get('/api/retry')
+    assert res.status_code == 429
+    assert res.headers['Retry-After'] == date
+    assert res.get_json()['response']['retry_after'] == date
+
+
+def test_range(client):
+    res = client.get('/api/range')
+    assert res.status_code == 416
+    assert res.headers['Content-Range'] == f"bytes */10"
+    data = res.get_json()['response']
+    assert data['length'] == 10
+    assert data['units'] == 'bytes'

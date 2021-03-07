@@ -1,7 +1,8 @@
 import traceback
+from datetime import datetime
 
 from flask import current_app as cap
-from werkzeug.exceptions import HTTPException, MethodNotAllowed
+from werkzeug import exceptions, http
 from werkzeug.routing import RequestRedirect
 
 from .exception import ApiProblem
@@ -26,7 +27,7 @@ class RequestRedirectMixin(BaseNormalize):
         :return:
         """
         if isinstance(ex, RequestRedirect):
-            location = dict(Location=ex.new_url)
+            location = dict(location=ex.new_url)
             ex.headers = location
             ex.response = location
 
@@ -40,12 +41,67 @@ class MethodNotAllowedMixin(BaseNormalize):
         :param ex:
         :return:
         """
-        if isinstance(ex, MethodNotAllowed):
+        if isinstance(ex, exceptions.MethodNotAllowed):
+            if isinstance(ex.valid_methods, (list, tuple)):
+                methods = ex.valid_methods
+            else:
+                methods = (ex.valid_methods,)
             try:
-                ex.headers = dict(Allow=", ".join(ex.valid_methods))
-                ex.response = dict(Allow=ex.valid_methods)
+                ex.headers = dict(Allow=", ".join(methods))
+                ex.response = dict(allowed=methods)
             except TypeError:  # pragma: no cover
                 pass
+
+        return super().normalize(ex)
+
+
+class UnauthorizedMixin(BaseNormalize):
+    def normalize(self, ex, **kwargs):
+        """
+
+        :param ex:
+        :return:
+        """
+        def to_dict(item):
+            item = dict(item)
+            item['auth_type'] = item.pop('__auth_type__', None)
+            return item
+
+        if isinstance(ex, exceptions.Unauthorized):
+            ex.headers = {"WWW-Authenticate": ", ".join([str(a) for a in ex.www_authenticate])}
+            ex.response = dict(authenticate=[to_dict(a) for a in ex.www_authenticate if a])
+
+        return super().normalize(ex)
+
+
+class RequestedRangeNotSatisfiableMixin(BaseNormalize):
+    def normalize(self, ex, **kwargs):
+        """
+
+        :param ex:
+        :return:
+        """
+        if isinstance(ex, exceptions.RequestedRangeNotSatisfiable):
+            ex.headers = {"Content-Range": f"{ex.units} */{ex.length}"}
+            ex.response = dict(units=ex.units, length=ex.length)
+
+        return super().normalize(ex)
+
+
+class RetryAfterMixin(BaseNormalize):
+    def normalize(self, ex, **kwargs):
+        """
+
+        :param ex:
+        :return:
+        """
+        if isinstance(ex, (exceptions.TooManyRequests, exceptions.ServiceUnavailable)):
+            retry = ex.retry_after
+            if isinstance(retry, datetime):
+                retry = http.http_date(retry)
+
+            ex.headers = {"Retry-After": str(retry)}
+            ex.response = dict(retry_after=ex.retry_after)
 
         return super().normalize(ex)
 
@@ -71,7 +127,7 @@ class NormalizerMixin(BaseNormalize):
 
         _ex = exc_class(mess, **kwargs)
 
-        if isinstance(ex, HTTPException):
+        if isinstance(ex, exceptions.HTTPException):
             _ex.code = ex.code
             _ex.description = ex.get_description()
             _ex.response = ex.response if hasattr(ex, 'response') else None
@@ -85,7 +141,10 @@ class NormalizerMixin(BaseNormalize):
 class DefaultNormalizer(
     NormalizerMixin,
     MethodNotAllowedMixin,
-    RequestRedirectMixin
+    RequestRedirectMixin,
+    UnauthorizedMixin,
+    RequestedRangeNotSatisfiableMixin,
+    RetryAfterMixin,
 ):
     """
         Default normalizer uses all mixins

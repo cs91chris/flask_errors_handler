@@ -98,12 +98,12 @@ class ApiProblem(InternalServerError):
 
         """
         return dict(
-            type=self.type.format(code=self.code),
+            type=self.get_type(),
+            instance=self.get_instance(),
+            detail=self.get_detail(),
             title=self.name,
             status=self.code,
-            instance=self.instance,
-            response=self.response,
-            detail=self.get_description()
+            response=self.response
         ), self.code, self.headers
 
     def get_type(self):

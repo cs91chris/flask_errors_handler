@@ -129,7 +129,7 @@ class NormalizerMixin(BaseNormalize):
 
         if isinstance(ex, exceptions.HTTPException):
             _ex.code = ex.code
-            _ex.description = ex.get_description()
+            _ex.description = ex.description
             _ex.response = ex.response if hasattr(ex, 'response') else None
             _ex.headers.update(**(ex.headers if hasattr(ex, 'headers') else {}))
         else:

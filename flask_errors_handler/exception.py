@@ -125,4 +125,4 @@ class ApiProblem(InternalServerError):
 
         :return:
         """
-        return self.get_description()
+        return self.description

@@ -68,8 +68,9 @@ class UnauthorizedMixin(BaseNormalize):
             return item
 
         if isinstance(ex, exceptions.Unauthorized):
-            ex.headers = {"WWW-Authenticate": ", ".join([str(a) for a in ex.www_authenticate])}
-            ex.response = dict(authenticate=[to_dict(a) for a in ex.www_authenticate if a])
+            if ex.www_authenticate:
+                ex.headers = {"WWW-Authenticate": ", ".join([str(a) for a in ex.www_authenticate])}
+                ex.response = dict(authenticate=[to_dict(a) for a in ex.www_authenticate if a])
 
         return super().normalize(ex)
 
@@ -82,8 +83,10 @@ class RequestedRangeNotSatisfiableMixin(BaseNormalize):
         :return:
         """
         if isinstance(ex, exceptions.RequestedRangeNotSatisfiable):
-            ex.headers = {"Content-Range": f"{ex.units} */{ex.length}"}
-            ex.response = dict(units=ex.units, length=ex.length)
+            if ex.length:
+                unit = ex.units or 'bytes'
+                ex.headers = {"Content-Range": f"{unit} */{ex.length}"}
+                ex.response = dict(units=unit, length=ex.length)
 
         return super().normalize(ex)
 
@@ -96,12 +99,13 @@ class RetryAfterMixin(BaseNormalize):
         :return:
         """
         if isinstance(ex, (exceptions.TooManyRequests, exceptions.ServiceUnavailable)):
-            retry = ex.retry_after
-            if isinstance(retry, datetime):
-                retry = http.http_date(retry)
+            if ex.retry_after:
+                retry = ex.retry_after
+                if isinstance(retry, datetime):
+                    retry = http.http_date(retry)
 
-            ex.headers = {"Retry-After": str(retry)}
-            ex.response = dict(retry_after=ex.retry_after)
+                ex.headers = {"Retry-After": str(retry)}
+                ex.response = dict(retry_after=ex.retry_after)
 
         return super().normalize(ex)
 
@@ -129,7 +133,7 @@ class NormalizerMixin(BaseNormalize):
 
         if isinstance(ex, exceptions.HTTPException):
             _ex.code = ex.code
-            _ex.description = ex.description
+            _ex.description = ex.get_description()
             _ex.response = ex.response if hasattr(ex, 'response') else None
             _ex.headers.update(**(ex.headers if hasattr(ex, 'headers') else {}))
         else:

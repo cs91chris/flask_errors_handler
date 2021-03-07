@@ -50,7 +50,7 @@ class MethodNotAllowedMixin(BaseNormalize):
         return super().normalize(ex)
 
 
-class DefaultNormalizeMixin(MethodNotAllowedMixin, RequestRedirectMixin):
+class NormalizerMixin(BaseNormalize):
     def normalize(self, ex, exc_class=ApiProblem, **kwargs):
         """
 
@@ -73,10 +73,20 @@ class DefaultNormalizeMixin(MethodNotAllowedMixin, RequestRedirectMixin):
 
         if isinstance(ex, HTTPException):
             _ex.code = ex.code
-            _ex.description = ex.description
+            _ex.description = ex.get_description()
             _ex.response = ex.response if hasattr(ex, 'response') else None
             _ex.headers.update(**(ex.headers if hasattr(ex, 'headers') else {}))
         else:
             cap.logger.error(tb)
 
         return _ex
+
+
+class DefaultNormalizer(
+    NormalizerMixin,
+    MethodNotAllowedMixin,
+    RequestRedirectMixin
+):
+    """
+        Default normalizer uses all mixins
+    """

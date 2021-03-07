@@ -61,17 +61,17 @@ class ApiProblem(InternalServerError):
     type = 'https://httpstatuses.com/{code}'
 
     default_html_template = '''
-        <html>
-            <head><title>{{ exc.code }}</title></head>
-            <body>
-                <h2>{{ exc.code }} - {{ exc.name }}</h2>
-                <p>Problem type: <a href="{{ exc.get_type() }}">{{ exc.get_type() }}</a></p>
-                <p>Problem specific: <a href="{{ exc.get_instance() }}">{{ exc.get_instance() }}</a></p>
-                <h3>Description</h3>
-                <p><pre>{{ exc.get_detail() }}</pre></p>
-            </body>
-        </html>
-        '''
+<html>
+    <head><title>{{ exc.code }}</title></head>
+    <body>
+        <h2>{{ exc.code }} - {{ exc.name }}</h2>
+        <p>Problem type: <a href="{{ exc.get_type() }}">{{ exc.get_type() }}</a></p>
+        <p>Problem specific: <a href="{{ exc.get_instance() }}">{{ exc.get_instance() }}</a></p>
+        <h3>Description</h3>
+        <p><pre>{{ exc.get_detail() }}</pre></p>
+    </body>
+</html>
+    '''
 
     def __init__(self, description=None, response=None, **kwargs):
         """
@@ -103,7 +103,7 @@ class ApiProblem(InternalServerError):
             status=self.code,
             instance=self.instance,
             response=self.response,
-            detail=self.description
+            detail=self.get_description()
         ), self.code, self.headers
 
     def get_type(self):
@@ -125,4 +125,4 @@ class ApiProblem(InternalServerError):
 
         :return:
         """
-        return self.description
+        return self.get_description()

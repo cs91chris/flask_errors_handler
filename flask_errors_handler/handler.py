@@ -7,22 +7,24 @@ from werkzeug.exceptions import default_exceptions
 
 from .dispatchers import DEFAULT_DISPATCHERS, ErrorDispatcher
 from .exception import ApiProblem
-from .normalize import DefaultNormalizeMixin
+from .normalize import DefaultNormalizer
 
 
-class ErrorHandler(DefaultNormalizeMixin):
+class ErrorHandler:
     def __init__(self, app=None, **kwargs):
         """
 
         :param app: optional Flask instance
         """
-        self._response = None
-        self._exc_class = None
+        self._response = kwargs.get('response')
+        self._exc_class = kwargs.get('exc_class')
+        self._normalizer = kwargs.get('normalizer')
 
         if app is not None:
             self.init_app(app, **kwargs)  # pragma: no cover
 
-    def init_app(self, app, response=None, exc_class=None, dispatcher=None, handler=None):
+    def init_app(self, app, response=None, exc_class=None,
+                 dispatcher=None, handler=None, normalizer=None):
         """
 
         :param app: Flask instance
@@ -30,9 +32,11 @@ class ErrorHandler(DefaultNormalizeMixin):
         :param exc_class: subclass of ApiProblem
         :param dispatcher: ErrorDispatcher instance or default configured string name
         :param handler: app error handler one of (api, web)
+        :param normalizer: normalize exceptions class
         """
         self._exc_class = exc_class or ApiProblem
         self._response = response or self._default_response_builder
+        self._normalizer = normalizer or DefaultNormalizer()
 
         assert issubclass(self._exc_class, ApiProblem)
 
@@ -161,7 +165,7 @@ class ErrorHandler(DefaultNormalizeMixin):
         :param ex: Exception instance
         :return: default template rendered response
         """
-        ex = self.normalize(ex, self._exc_class)
+        ex = self._normalizer.normalize(ex, self._exc_class)
         return flask.render_template_string(ex.default_html_template, exc=ex), ex.code
 
     def _api_handler(self, ex):
@@ -170,7 +174,7 @@ class ErrorHandler(DefaultNormalizeMixin):
         :param ex: Exception instance
         :return: response built from self._response
         """
-        ex = self.normalize(ex, self._exc_class)
+        ex = self._normalizer.normalize(ex, self._exc_class)
 
         if isinstance(ex.response, flask.Response):
             return ex.response, ex.code
@@ -188,7 +192,7 @@ class ErrorHandler(DefaultNormalizeMixin):
         :param ex: Exception instance
         :return: a template rendered response
         """
-        ex = self.normalize(ex, self._exc_class)
+        ex = self._normalizer.normalize(ex, self._exc_class)
 
         if cap.config['ERROR_XHR_ENABLED'] is True:
             # check if request is XHR (for compatibility with old clients)
@@ -271,4 +275,4 @@ class ErrorHandler(DefaultNormalizeMixin):
                 :return: dispatcher response
                 """
                 d = dispatcher_class()
-                return d.dispatch(self.normalize(exc, self._exc_class))
+                return d.dispatch(self._normalizer.normalize(exc, self._exc_class))

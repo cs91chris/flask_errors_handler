@@ -7,7 +7,7 @@ from werkzeug.exceptions import default_exceptions
 
 from .dispatchers import DEFAULT_DISPATCHERS, ErrorDispatcher
 from .exception import ApiProblem
-from .normalize import DefaultNormalizer
+from .normalize import DefaultNormalizer, BaseNormalize
 
 
 class ErrorHandler:
@@ -34,11 +34,12 @@ class ErrorHandler:
         :param handler: app error handler one of (api, web)
         :param normalizer: normalize exceptions class
         """
-        self._exc_class = exc_class or ApiProblem
-        self._response = response or self._default_response_builder
-        self._normalizer = normalizer or DefaultNormalizer()
+        self._exc_class = exc_class or self._exc_class or ApiProblem
+        self._normalizer = normalizer or self._normalizer or DefaultNormalizer()
+        self._response = response or self._response or self._default_response_builder
 
         assert issubclass(self._exc_class, ApiProblem)
+        assert isinstance(self._normalizer, BaseNormalize)
 
         self.set_default_config(app)
 

@@ -1,6 +1,6 @@
 """
 Flask-ErrorsHandler
--------------
+-------------------
 """
 import os
 import re
@@ -14,33 +14,16 @@ VERSION_FILE = os.path.join('flask_errors_handler', 'version.py')
 
 
 def read(file):
-    """
-
-    :param file:
-    :return:
-    """
     with open(os.path.join(BASE_PATH, file)) as f:
         return f.read()
 
 
 def grep(file, name):
-    """
-
-    :param file:
-    :param name:
-    :return:
-    """
-    pattern = r"{attr}\W*=\W*'([^']+)'".format(attr=name)
-    strval, = re.findall(pattern, read(file))
+    strval, = re.findall(fr"{name}\W*=\W*'([^']+)'", read(file))
     return strval
 
 
 def readme(file):
-    """
-
-    :param file:
-    :return:
-    """
     try:
         return read(file)
     except OSError as exc:
@@ -49,15 +32,9 @@ def readme(file):
 
 class PyTest(test):
     def finalize_options(self):
-        """
-
-        """
         test.finalize_options(self)
 
     def run_tests(self):
-        """
-
-        """
         import pytest
         sys.exit(pytest.main(['tests']))
 

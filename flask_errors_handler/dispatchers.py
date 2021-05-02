@@ -1,5 +1,3 @@
-from warnings import warn
-
 import flask
 from flask import current_app as cap
 
@@ -49,7 +47,7 @@ class SubdomainDispatcher(ErrorDispatcher):
                     for k, v in (handler or {}).items():
                         return v(exc)
         else:  # pragma: no cover
-            warn("You must set 'SERVER_NAME' in order to use {}".format(self.__class__.__name__))
+            cap.logger.warning("You must set 'SERVER_NAME' in order to use %s", self.__class__)
 
         return self.default(exc)  # pragma: no cover
 
@@ -63,7 +61,7 @@ class URLPrefixDispatcher(ErrorDispatcher):
         """
         for bp_name, bp in cap.blueprints.items():
             if not bp.url_prefix:
-                warn("You must set 'url_prefix' when instantiate Blueprint: '{}'".format(bp_name))
+                cap.logger.warning("You must set 'url_prefix' when instantiate Blueprint: '%s'", bp_name)
                 continue
 
             if flask.request.path.startswith(bp.url_prefix):

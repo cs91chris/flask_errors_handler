@@ -7,7 +7,7 @@ from werkzeug.exceptions import default_exceptions
 
 from .dispatchers import DEFAULT_DISPATCHERS, ErrorDispatcher
 from .exception import ApiProblem
-from .normalize import DefaultNormalizer, BaseNormalize
+from .normalize import BaseNormalize, DefaultNormalizer
 
 
 class ErrorHandler:
@@ -57,7 +57,7 @@ class ErrorHandler:
         elif handler == 'web':
             self.web_register(app)  # pragma: no cover
         else:
-            app.logger.warning("invalid handler: '{}'".format(handler))
+            app.logger.warning("invalid handler: '%s'", handler)
 
     @staticmethod
     def set_default_config(app):
@@ -254,17 +254,17 @@ class ErrorHandler:
                 dispatcher_class = dispatcher
             else:  # pragma: no cover
                 app.logger.error(
-                    "dispatcher '{}' must be subclass of '{}'".format(
-                        dispatcher, ErrorDispatcher.__name__
-                    ))
+                    "dispatcher '%s' must be subclass of '%s'",
+                    dispatcher, ErrorDispatcher.__name__
+                )
                 return
         except TypeError:  # dispatcher is not a class
             dispatcher_class = DEFAULT_DISPATCHERS.get(dispatcher)
             if not dispatcher_class:  # pragma: no cover
                 app.logger.error(
-                    "dispatcher '{}' not exists. Use one of {}".format(
-                        dispatcher, DEFAULT_DISPATCHERS.keys()
-                    ))
+                    "dispatcher '%s' not exists. Use one of %s",
+                    dispatcher, DEFAULT_DISPATCHERS.keys()
+                )
                 return
 
         for c in codes:

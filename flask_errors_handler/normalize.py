@@ -62,6 +62,7 @@ class UnauthorizedMixin(BaseNormalize):
         :param ex:
         :return:
         """
+
         def to_dict(item):
             item = dict(item)
             item['auth_type'] = item.pop('__auth_type__', None)
@@ -111,6 +112,10 @@ class RetryAfterMixin(BaseNormalize):
 
 
 class NormalizerMixin(BaseNormalize):
+    class DumpEx:
+        def __str__(self):
+            return traceback.format_exc()
+
     def normalize(self, ex, exc_class=ApiProblem, **kwargs):
         """
 
@@ -123,9 +128,9 @@ class NormalizerMixin(BaseNormalize):
         if isinstance(ex, exc_class):
             return ex
 
-        tb = traceback.format_exc()
+        tb = self.DumpEx()
         if cap.config['DEBUG']:
-            mess = tb  # pragma: no cover
+            mess = str(tb)  # pragma: no cover
         else:
             mess = cap.config['ERROR_DEFAULT_MSG']
 
@@ -134,10 +139,17 @@ class NormalizerMixin(BaseNormalize):
         if isinstance(ex, exceptions.HTTPException):
             _ex.code = ex.code
             _ex.description = ex.get_description()
-            _ex.response = ex.response if hasattr(ex, 'response') else None
-            _ex.headers.update(**(ex.headers if hasattr(ex, 'headers') else {}))
+            try:
+                _ex.response = ex.response
+            except AttributeError:
+                _ex.response = None
+            try:
+                # noinspection PyUnresolvedReferences
+                _ex.headers.update(ex.headers)
+            except AttributeError:
+                pass
         else:
-            cap.logger.error(tb)
+            cap.logger.error("%s", tb)
 
         return _ex
 
